@@ -157,11 +157,6 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 	}
 	for i := 0; i < modelType.NumField(); i++ {
 		field := modelType.Field(i)
-		header := field.Tag.Get("excel_header") // get excel_header tag
-		if header == "" {                       // if no excel_header tag, use field name as header
-			header = field.Name
-		}
-
 		cellName, err := CoordinatesToCellName(i+1, line, false)
 		if err != nil {
 			return err
