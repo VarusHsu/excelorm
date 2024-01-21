@@ -45,6 +45,13 @@ if err != nil {
 }
 ```
 * you can see the result in the file<br>
+
+| 姓名 | 年龄 | 生日                  | 工作  |
+|----|----|---------------------|-----|
+| 张三 | 18 | 2021-08-08 16:00:00 |     |
+| 李四 | 20 | 2021-08-08 16:00:00 | 程序员 |
+
+
 [test.xlsx](test.xlsx)
 
-* support multi sheet by define more struct
+* support multi sheet by define more structs
