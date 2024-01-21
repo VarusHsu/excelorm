@@ -10,10 +10,10 @@ go get github.com/varushsu/excelorm
 * define a struct with excel_header tag and implement `SheetName` method
 ```go
 type User struct {
-Name     string    `excel_header:"姓名"`
-Age      int       `excel_header:"年龄"`
-Birthday time.Time `excel_header:"生日"`
-Jobs     *string   `excel_header:"工作"`
+    Name     string    `excel_header:"姓名"`
+    Age      int       `excel_header:"年龄"`
+    Birthday time.Time `excel_header:"生日"`
+    Jobs     *string   `excel_header:"工作"`
 }
 func (u User) SheetName() string {
     return "用户信息"
