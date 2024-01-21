@@ -1,5 +1,5 @@
 # excelorm
-a easier use excel write tool for golang
+a easier use excel file create tool for golang
 
 ## install
 ```shell
@@ -54,4 +54,4 @@ if err != nil {
 
 [test.xlsx](test.xlsx)
 
-* support multi sheet by define more structs
+* support multi-sheets by define more structs

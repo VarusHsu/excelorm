@@ -11,7 +11,7 @@ import (
 
 type Option func(*options)
 
-// Build 生成excel文件
+// WriteExcel 生成excel文件
 // example usage:
 // * define a struct
 //
@@ -43,7 +43,7 @@ type Option func(*options)
 //	}
 //
 // * build Excel file
-// err := Build("user.xlsx", sheetModels, WithTimeFormatLayout("2006/01/02 15:04:05"))
+// err := WriteExcel("user.xlsx", sheetModels, WithTimeFormatLayout("2006/01/02 15:04:05"))
 //
 //	if err != nil {
 //		 log.Fatal(err)
@@ -54,7 +54,7 @@ type Option func(*options)
 // then construct any of their objects to append to sheetModels
 // different sheetModel better have different sheet name to avoid confusion
 // rows ordered in Excel file is the same as sheetModels
-func Build(fileName string, sheetModels []SheetModel, opts ...Option) error {
+func WriteExcel(fileName string, sheetModels []SheetModel, opts ...Option) error {
 	// default options
 	options := &options{
 		timeFormatLayout: "2006-01-02 15:04:05",

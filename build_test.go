@@ -82,7 +82,7 @@ func (Sheet7) SheetName() string {
 	return "sheet7"
 }
 
-func TestBuild(t *testing.T) {
+func TestWriteExcel(t *testing.T) {
 	sheet1 := Sheet1{
 		Col1:  "string",
 		Col2:  1,
@@ -111,7 +111,7 @@ func TestBuild(t *testing.T) {
 	var models []SheetModel
 	models = append(models, sheet1, sheet1, sheet1, sheet1, sheet1, sheet2, sheet2, sheet2, sheet2, sheet2)
 
-	err := Build("test1.xlsx", models)
+	err := WriteExcel("test1.xlsx", models)
 	if err != nil {
 		t.Error(err)
 	}
@@ -121,13 +121,13 @@ func TestBuild(t *testing.T) {
 	}
 
 	models = append(models, sheet3)
-	err = Build("test3.xlsx", models)
+	err = WriteExcel("test3.xlsx", models)
 	assert.EqualError(t, err, "sheetModel must have a sheet name")
 
 	sheet4 := Sheet4(1)
 	models = make([]SheetModel, 0)
 	models = append(models, sheet4)
-	err = Build("test4.xlsx", models)
+	err = WriteExcel("test4.xlsx", models)
 	assert.EqualError(t, err, "sheetModel must be struct")
 
 	sheet5 := Sheet5{
@@ -135,7 +135,7 @@ func TestBuild(t *testing.T) {
 	}
 	models = make([]SheetModel, 0)
 	models = append(models, sheet5)
-	err = Build("test5.xlsx", models)
+	err = WriteExcel("test5.xlsx", models)
 
 	sheet6 := Sheet6{
 		Col1: map[string]string{
@@ -144,7 +144,7 @@ func TestBuild(t *testing.T) {
 	}
 	models = make([]SheetModel, 0)
 	models = append(models, sheet6)
-	err = Build("test6.xlsx", models)
+	err = WriteExcel("test6.xlsx", models)
 	assert.EqualError(t, err, "unsupported type map")
 
 	sheet7 := Sheet7{
@@ -154,7 +154,7 @@ func TestBuild(t *testing.T) {
 	}
 	models = make([]SheetModel, 0)
 	models = append(models, sheet7)
-	err = Build("test7.xlsx", models)
+	err = WriteExcel("test7.xlsx", models)
 	assert.EqualError(t, err, "unsupported type excelorm.subStruct")
 }
 
@@ -187,7 +187,7 @@ func TestWithTimeFormatLayout(t *testing.T) {
 	var models []SheetModel
 	models = append(models, sheet1, sheet1, sheet1, sheet1, sheet1, sheet2, sheet2, sheet2, sheet2, sheet2)
 
-	err := Build("test.xlsx", models, WithTimeFormatLayout("2006/01/02 15:04:05"))
+	err := WriteExcel("test.xlsx", models, WithTimeFormatLayout("2006/01/02 15:04:05"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -222,7 +222,7 @@ func TestWithIfNullValue(t *testing.T) {
 	var models []SheetModel
 	models = append(models, sheet1, sheet1, sheet1, sheet1, sheet1, sheet2, sheet2, sheet2, sheet2, sheet2)
 
-	err := Build("test.xlsx", models, WithIfNullValue("-"))
+	err := WriteExcel("test.xlsx", models, WithIfNullValue("-"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -257,7 +257,7 @@ func TestWithFloatPrecision(t *testing.T) {
 	var models []SheetModel
 	models = append(models, sheet1, sheet1, sheet1, sheet1, sheet1, sheet2, sheet2, sheet2, sheet2, sheet2)
 
-	err := Build("test.xlsx", models, WithFloatPrecision(10))
+	err := WriteExcel("test.xlsx", models, WithFloatPrecision(10))
 	if err != nil {
 		t.Error(err)
 	}
@@ -292,7 +292,7 @@ func TestWithFloatFmt(t *testing.T) {
 	var models []SheetModel
 	models = append(models, sheet1, sheet1, sheet1, sheet1, sheet1, sheet2, sheet2, sheet2, sheet2, sheet2)
 
-	err := Build("test.xlsx", models, WithFloatFmt('e'))
+	err := WriteExcel("test.xlsx", models, WithFloatFmt('e'))
 	if err != nil {
 		t.Error(err)
 	}
