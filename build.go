@@ -147,7 +147,7 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 			if header == "" { // if no excel_header tag, use field name as header
 				header = field.Name
 			}
-			cellName, err := CoordinatesToCellName(i+1, 1, false)
+			cellName, err := coordinatesToCellName(i+1, 1)
 			if err != nil {
 				return err
 			}
@@ -157,7 +157,7 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 	}
 	for i := 0; i < modelType.NumField(); i++ {
 		field := modelType.Field(i)
-		cellName, err := CoordinatesToCellName(i+1, line, false)
+		cellName, err := coordinatesToCellName(i+1, line)
 		if err != nil {
 			return err
 		}
@@ -218,12 +218,12 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 
 // next code is copied and modified from https://github.com/360EntSecGroup-Skylar/excelize
 
-// CoordinatesToCellName converts [X, Y] coordinates to alpha-numeric cell
+// coordinatesToCellName converts [X, Y] coordinates to alpha-numeric cell
 // name or returns an error.
 // egs:
 //
-//	excelize.CoordinatesToCellName(1, 1) // returns "A1", nil
-func CoordinatesToCellName(col, row int, abs ...bool) (string, error) {
+//	excelize.coordinatesToCellName(1, 1) // returns "A1", nil
+func coordinatesToCellName(col, row int) (string, error) {
 	const totalRows = 1048576
 	if col < 1 || row < 1 {
 		return "", fmt.Errorf("invalid cell reference [%d, %d]", col, row)
@@ -232,18 +232,13 @@ func CoordinatesToCellName(col, row int, abs ...bool) (string, error) {
 		return "", errors.New("row number exceeds maximum limit")
 	}
 	sign := ""
-	for _, a := range abs {
-		if a {
-			sign = "$"
-		}
-	}
-	colName, err := ColumnNumberToName(col)
+	colName, err := columnNumberToName(col)
 	return sign + colName + sign + strconv.Itoa(row), err
 }
 
-// ColumnNumberToName provides a function to convert the integer to Excel
+// columnNumberToName provides a function to convert the integer to Excel
 // sheet column title.
-func ColumnNumberToName(num int) (string, error) {
+func columnNumberToName(num int) (string, error) {
 	const (
 		minColumns = 1
 		maxColumns = 16384
