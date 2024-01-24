@@ -1,6 +1,7 @@
 package excelorm
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"github.com/360EntSecGroup-Skylar/excelize"
@@ -11,7 +12,7 @@ import (
 
 type Option func(*options)
 
-// WriteExcel 生成excel文件
+// WriteExcelSaveAs 生成excel文件并保存到本地
 // example usage:
 // * define a struct
 //
@@ -43,7 +44,7 @@ type Option func(*options)
 //	}
 //
 // * build Excel file
-// err := WriteExcel("user.xlsx", sheetModels, WithTimeFormatLayout("2006/01/02 15:04:05"))
+// err := WriteExcelSaveAs("user.xlsx", sheetModels, WithTimeFormatLayout("2006/01/02 15:04:05"))
 //
 //	if err != nil {
 //		 log.Fatal(err)
@@ -54,7 +55,16 @@ type Option func(*options)
 // then construct any of their objects to append to sheetModels
 // different sheetModel better have different sheet name to avoid confusion
 // rows ordered in Excel file is the same as sheetModels
-func WriteExcel(fileName string, sheetModels []SheetModel, opts ...Option) error {
+func WriteExcelSaveAs(fileName string, sheetModels []SheetModel, opts ...Option) error {
+	f, err := write(sheetModels, opts...)
+	if err != nil {
+		return err
+	}
+	return f.SaveAs(fileName)
+}
+
+// WriteExcelAsBytesBuffer generate excel and save as excelize.File
+func write(sheetModels []SheetModel, opts ...Option) (*excelize.File, error) {
 	// default options
 	options := &options{
 		timeFormatLayout: "2006-01-02 15:04:05",
@@ -73,7 +83,7 @@ func WriteExcel(fileName string, sheetModels []SheetModel, opts ...Option) error
 	for _, sheetModel := range sheetModels {
 		sheetName := sheetModel.SheetName()
 		if sheetName == "" {
-			return errors.New("sheetModel must have a sheet name")
+			return nil, errors.New("sheetModel must have a sheet name")
 		}
 
 		modelKind := reflect.TypeOf(sheetModel).Kind()
@@ -82,18 +92,94 @@ func WriteExcel(fileName string, sheetModels []SheetModel, opts ...Option) error
 			l := sheetLinesCount[sheetName]
 			err := appendRow(f, sheetModel, l, options)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			sheetLinesCount[sheetName]++
 			if l == 0 { // first line is header, so counter increase again
 				sheetLinesCount[sheetName]++
 			}
 		default:
-			return errors.New("sheetModel must be struct")
+			return nil, errors.New("sheetModel must be struct")
 		}
 	}
-	f.DeleteSheet("Sheet1")
-	return f.SaveAs(fileName)
+	err := setNoDataSheetHeaders(f, options)
+	if err != nil {
+		return nil, err
+	}
+	// delete default sheet
+	var containsModelSheetNameEqSheet1 bool
+	for _, sheetModel := range sheetModels {
+		if sheetModel.SheetName() == "Sheet1" {
+			containsModelSheetNameEqSheet1 = true
+			break
+		}
+	}
+	for _, sheetModel := range options.sheetHeaders {
+		if sheetModel.SheetName() == "Sheet1" {
+			containsModelSheetNameEqSheet1 = true
+			break
+		}
+	}
+	if !containsModelSheetNameEqSheet1 {
+		f.DeleteSheet("Sheet1")
+	}
+	return f, nil
+}
+
+func setNoDataSheetHeaders(f *excelize.File, options *options) error {
+	models := options.sheetHeaders
+	if len(models) == 0 {
+		return nil
+	}
+	for _, model := range models {
+		sheetName := model.SheetName()
+		idx := f.GetSheetIndex(sheetName)
+		if idx != 0 {
+			// sheet exists, continue
+			continue
+		}
+		f.NewSheet(sheetName)
+
+		// check if sheetModel is pointer
+		if reflect.TypeOf(model).Kind() == reflect.Ptr {
+			if reflect.ValueOf(model).Elem().CanAddr() { // check if sheetModel is nil
+				// replace to sheetModel's reference value
+				// if type(model) is SheetModel, then *model is still SheetModel
+				model = reflect.Indirect(reflect.ValueOf(model)).Interface().(SheetModel)
+			} else {
+				return errors.New("nil reference row append is now allow")
+			}
+		}
+
+		modelType := reflect.TypeOf(model)
+		for i := 0; i < modelType.NumField(); i++ {
+			field := modelType.Field(i)
+			header := field.Tag.Get("excel_header")
+			if header == "" { // if no excel_header tag, use field name as header
+				header = field.Name
+			}
+			cellName, err := coordinatesToCellName(i+1, 1)
+			if err != nil {
+				return err
+			}
+			f.SetCellValue(sheetName, cellName, header) // set header
+		}
+	}
+	return nil
+}
+
+// WriteExcelAsBytesBuffer generate excel and save as bytes.Buffer
+func WriteExcelAsBytesBuffer(sheetModels []SheetModel, opts ...Option) (*bytes.Buffer, error) {
+	buffer := new(bytes.Buffer)
+	f, err := write(sheetModels, opts...)
+	if err != nil {
+		return nil, err
+	}
+	err = f.Write(buffer)
+	if err != nil {
+		return nil, err
+	}
+	return buffer, nil
 }
 
 type SheetModel interface {
@@ -101,10 +187,11 @@ type SheetModel interface {
 }
 
 type options struct {
-	timeFormatLayout string // time.Time, *time.Time 的格式化版图
-	floatPrecision   int    // 小数保留多少位
-	floatFmt         byte   // 小数的格式，默认为'f',详细见 strconv.FormatFloat 的注释
-	ifNullValue      string // null pointer		空值的默认显示
+	timeFormatLayout string       // time.Time, *time.Time 的格式化版图
+	floatPrecision   int          // 小数保留多少位
+	floatFmt         byte         // 小数的格式，默认为'f',详细见 strconv.FormatFloat 的注释
+	ifNullValue      string       // null pointer		空值的默认显示
+	sheetHeaders     []SheetModel // 当没有数据时，表头的默认显示
 }
 
 func WithTimeFormatLayout(layout string) Option {
@@ -131,13 +218,31 @@ func WithIfNullValue(value string) Option {
 	}
 }
 
+// WithSheetHeaders 当没有数据时，默认也要展示表头
+func WithSheetHeaders(headers ...SheetModel) Option {
+	return func(options *options) {
+		options.sheetHeaders = headers
+	}
+}
+
 func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *options) error {
 	sheetName := sheetModel.SheetName()
 	// find if sheetName exists
 	sheetIndex := f.GetSheetIndex(sheetName)
 	if sheetIndex == 0 {
-		sheetIndex = f.NewSheet(sheetName) // create sheet
+		f.NewSheet(sheetName) // create sheet
 	}
+	// check if sheetModel is pointer
+	if reflect.TypeOf(sheetModel).Kind() == reflect.Ptr {
+		if reflect.ValueOf(sheetModel).Elem().CanAddr() { // check if sheetModel is nil
+			// replace to sheetModel's reference value
+			// if type(sheetModel) is SheetModel, then *sheetModel is still SheetModel
+			sheetModel = reflect.Indirect(reflect.ValueOf(sheetModel)).Interface().(SheetModel)
+		} else {
+			return errors.New("nil reference row append is now allow")
+		}
+	}
+
 	modelType := reflect.TypeOf(sheetModel)
 	line++         // index start from 0 but excel start from 1
 	if line == 1 { // set header
@@ -222,7 +327,7 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 // name or returns an error.
 // egs:
 //
-//	excelize.coordinatesToCellName(1, 1) // returns "A1", nil
+// coordinatesToCellName(1, 1) // returns "A1", nil
 func coordinatesToCellName(col, row int) (string, error) {
 	const totalRows = 1048576
 	if col < 1 || row < 1 {
@@ -231,9 +336,8 @@ func coordinatesToCellName(col, row int) (string, error) {
 	if row > totalRows {
 		return "", errors.New("row number exceeds maximum limit")
 	}
-	sign := ""
 	colName, err := columnNumberToName(col)
-	return sign + colName + sign + strconv.Itoa(row), err
+	return colName + strconv.Itoa(row), err
 }
 
 // columnNumberToName provides a function to convert the integer to Excel

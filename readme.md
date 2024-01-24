@@ -39,7 +39,7 @@ sheetModels = append(sheetModels, user1, user2)
 ```
 * write to excel file
 ```go
-err := excelorm.WriteExcel("test.xlsx", sheetModels)
+err := excelorm.WriteExcelSaveAs("test.xlsx", sheetModels)
 if err != nil {
     panic(err)
 }
