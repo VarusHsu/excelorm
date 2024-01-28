@@ -192,6 +192,8 @@ type options struct {
 	floatFmt         byte         // 小数的格式，默认为'f',详细见 strconv.FormatFloat 的注释
 	ifNullValue      string       // null pointer		空值的默认显示
 	sheetHeaders     []SheetModel // 当没有数据时，表头的默认显示
+	trueValue        *string      // bool类型的true显示值
+	falseValue       *string      // bool类型的false显示值
 }
 
 func WithTimeFormatLayout(layout string) Option {
@@ -222,6 +224,14 @@ func WithIfNullValue(value string) Option {
 func WithSheetHeaders(headers ...SheetModel) Option {
 	return func(options *options) {
 		options.sheetHeaders = headers
+	}
+}
+
+// WithBoolValueAs 当字段类型为bool时，true和false的显示值
+func WithBoolValueAs(trueValue, falseValue string) Option {
+	return func(options *options) {
+		options.trueValue = &trueValue
+		options.falseValue = &falseValue
 	}
 }
 
@@ -285,8 +295,17 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 			reflect.Float32, reflect.Float64:
 			value := fieldValue.Interface() // get field value (type interface{})
 			switch value.(type) {           // type assertion
-			case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, bool, string:
+			case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, string:
 				f.SetCellValue(sheetName, cellName, value) // set cell value
+			case bool:
+				b := value.(bool)
+				if options.trueValue != nil && b {
+					f.SetCellValue(sheetName, cellName, *options.trueValue)
+				} else if options.falseValue != nil && !b {
+					f.SetCellValue(sheetName, cellName, *options.falseValue)
+				} else {
+					f.SetCellValue(sheetName, cellName, value)
+				}
 			case float32: // convert float32 to string using options
 				f.SetCellValue(sheetName,
 					cellName,
