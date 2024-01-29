@@ -56,6 +56,9 @@ type Option func(*options)
 // different sheetModel better have different sheet name to avoid confusion
 // rows ordered in Excel file is the same as sheetModels
 func WriteExcelSaveAs(fileName string, sheetModels []SheetModel, opts ...Option) error {
+	if fileName == "" {
+		return errors.New("fileName can not be empty")
+	}
 	f, err := write(sheetModels, opts...)
 	if err != nil {
 		return err
