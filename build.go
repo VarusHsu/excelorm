@@ -160,6 +160,8 @@ func setNoDataSheetHeaders(f *excelize.File, options *options) error {
 			header := field.Tag.Get("excel_header")
 			if header == "" { // if no excel_header tag, use field name as header
 				header = field.Name
+			} else if header == "-" {
+				continue // skip this field if header is "-"
 			}
 			cellName, err := coordinatesToCellName(i+1, 1)
 			if err != nil {
