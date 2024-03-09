@@ -3,7 +3,7 @@ a easier use excel file create tool for golang
 
 ## install
 ```shell
-go get github.com/varushsu/excelorm
+ go get -u 'github.com/varushsu/excelorm@latest'
 ```
 
 ## Quick Start
