@@ -344,3 +344,38 @@ func TestWithBoolValueAs(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestWithHeadless(t *testing.T) {
+	sheet1 := Sheet1{
+		Col1:  "string",
+		Col2:  1,
+		Col3:  1.1,
+		Col4:  true,
+		Col5:  time.Now(),
+		Col6:  nil,
+		Col7:  nil,
+		Col8:  nil,
+		Col9:  nil,
+		Col10: nil,
+	}
+	var a = "string_value"
+	sheet2 := Sheet2{
+		Col1:  "string",
+		Col2:  1,
+		Col3:  1.1,
+		Col4:  false,
+		Col5:  time.Now(),
+		Col6:  &a,
+		Col7:  nil,
+		Col8:  nil,
+		Col9:  nil,
+		Col10: nil,
+	}
+	var models []SheetModel
+	models = append(models, sheet1, sheet1, sheet1, sheet1, sheet1, sheet2, sheet2, sheet2, sheet2, sheet2)
+
+	err := WriteExcelSaveAs("test15.xlsx", models, WithHeadless())
+	if err != nil {
+		t.Error(err)
+	}
+}

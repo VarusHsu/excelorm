@@ -98,7 +98,7 @@ func write(sheetModels []SheetModel, opts ...Option) (*excelize.File, error) {
 				return nil, err
 			}
 			sheetLinesCount[sheetName]++
-			if l == 0 { // first line is header, so counter increase again
+			if l == 0 && !options.headless { // first line is header, so counter increase again
 				sheetLinesCount[sheetName]++
 			}
 		default:
