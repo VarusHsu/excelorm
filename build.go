@@ -150,7 +150,7 @@ func setNoDataSheetHeaders(f *excelize.File, options *options) error {
 				// if type(model) is SheetModel, then *model is still SheetModel
 				model = reflect.Indirect(reflect.ValueOf(model)).Interface().(SheetModel)
 			} else {
-				return errors.New("nil reference row append is now allow")
+				return errors.New("nil reference row append is not allowed")
 			}
 		}
 
@@ -199,6 +199,8 @@ type options struct {
 	sheetHeaders     []SheetModel // 当没有数据时，表头的默认显示
 	trueValue        *string      // bool类型的true显示值
 	falseValue       *string      // bool类型的false显示值
+	integerAsString  bool         // int类型的字段是否以字符串形式显示(避免excel自动转为科学计数法)
+	headless         bool         // 是否显示表头
 }
 
 func WithTimeFormatLayout(layout string) Option {
@@ -240,6 +242,20 @@ func WithBoolValueAs(trueValue, falseValue string) Option {
 	}
 }
 
+// WithIntegerAsString int类型的字段是否以字符串形式显示(避免excel自动转为科学计数法)
+func WithIntegerAsString() Option {
+	return func(options *options) {
+		options.integerAsString = true
+	}
+}
+
+// WithHeadless 不显示表头
+func WithHeadless() Option {
+	return func(options *options) {
+		options.headless = true
+	}
+}
+
 func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *options) error {
 	sheetName := sheetModel.SheetName()
 	// find if sheetName exists
@@ -254,13 +270,13 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 			// if type(sheetModel) is SheetModel, then *sheetModel is still SheetModel
 			sheetModel = reflect.Indirect(reflect.ValueOf(sheetModel)).Interface().(SheetModel)
 		} else {
-			return errors.New("nil reference row append is now allow")
+			return errors.New("nil reference row append is not allowed")
 		}
 	}
 
 	modelType := reflect.TypeOf(sheetModel)
-	line++         // index start from 0 but excel start from 1
-	if line == 1 { // set header
+	line++                              // index start from 0 but excel start from 1
+	if line == 1 && !options.headless { // set header
 		for i := 0; i < modelType.NumField(); i++ {
 			field := modelType.Field(i)
 			header := field.Tag.Get("excel_header")
@@ -300,15 +316,27 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 			reflect.Float32, reflect.Float64:
 			value := fieldValue.Interface() // get field value (type interface{})
 			switch value.(type) {           // type assertion
-			case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, string:
-				f.SetCellValue(sheetName, cellName, value) // set cell value
-			case bool:
-				b := value.(bool)
-				if options.trueValue != nil && b {
-					f.SetCellValue(sheetName, cellName, *options.trueValue)
-				} else if options.falseValue != nil && !b {
-					f.SetCellValue(sheetName, cellName, *options.falseValue)
+			case int, int8, int16, int32, int64:
+				if options.integerAsString {
+					f.SetCellValue(sheetName, cellName, strconv.FormatInt(fieldValue.Int(), 10)) // set int cell value
 				} else {
+					f.SetCellValue(sheetName, cellName, value)
+				}
+			case uint, uint8, uint16, uint32, uint64:
+				if options.integerAsString {
+					f.SetCellValue(sheetName, cellName, strconv.FormatUint(fieldValue.Uint(), 10)) // set uint cell value
+				} else {
+					f.SetCellValue(sheetName, cellName, value)
+				}
+			case string:
+				f.SetCellValue(sheetName, cellName, value) // set string cell value
+			case bool: // convert bool to string using options
+				b := value.(bool)
+				if options.trueValue != nil && b { // if trueValue is set and value is true
+					f.SetCellValue(sheetName, cellName, *options.trueValue)
+				} else if options.falseValue != nil && !b { // if falseValue is set and value is false
+					f.SetCellValue(sheetName, cellName, *options.falseValue)
+				} else { // using default
 					f.SetCellValue(sheetName, cellName, value)
 				}
 			case float32: // convert float32 to string using options
@@ -351,7 +379,7 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 // name or returns an error.
 // egs:
 //
-// coordinatesToCellName(1, 1) // returns "A1", nil
+//	excelize.coordinatesToCellName(1, 1) // returns "A1", nil
 func coordinatesToCellName(col, row int) (string, error) {
 	const totalRows = 1048576
 	if col < 1 || row < 1 {
