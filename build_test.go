@@ -379,3 +379,11 @@ func TestWithHeadless(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestAppendNilRow(t *testing.T) {
+	var models []SheetModel
+	models = append(models, nil)
+	err := WriteExcelSaveAs("test16.xlsx", models)
+	assert.EqualError(t, err, "nil reference row append is not allowed")
+
+}

@@ -84,6 +84,9 @@ func write(sheetModels []SheetModel, opts ...Option) (*excelize.File, error) {
 	f := excelize.NewFile()
 	sheetLinesCount := make(map[string]int)
 	for _, sheetModel := range sheetModels {
+		if sheetModel == nil {
+			return nil, errors.New("nil reference row append is not allowed")
+		}
 		sheetName := sheetModel.SheetName()
 		if sheetName == "" {
 			return nil, errors.New("sheetModel must have a sheet name")
