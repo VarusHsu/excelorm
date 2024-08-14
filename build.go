@@ -181,7 +181,7 @@ func setNoDataSheetHeaders(f *excelize.File, options *options) error {
 	return nil
 }
 
-// WriteExcelAsBytesBuffer generate excel and save as excelize.File
+// WriteExcelAsBytesBuffer 生成excel并保存为 bytes.Buffer, 用法同 WriteExcelSaveAs
 func WriteExcelAsBytesBuffer(sheetModels []SheetModel, opts ...Option) (*bytes.Buffer, error) {
 	buffer := new(bytes.Buffer)
 	f, err := write(sheetModels, opts...)
