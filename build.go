@@ -14,48 +14,54 @@ type Option func(*options)
 
 // WriteExcelSaveAs 生成excel文件并保存到本地
 // example usage:
-// * define a struct
-//
-//	type User struct {
-//		 ID        int64      `excel_header:"id"`
-//		 Name      string     `excel_header:"name"`
-//		 Age       int        `excel_header:"age"`
+//	//define a struct
+//	type Foo struct {
+//		ID        int64      `excel_header:"id"`
+//		Name      string     `excel_header:"name"`
+//		CreatedAt time.Time  `excel_header:"created_at"`
+//		DeletedAt *time.Time `excel_header:"deleted_at"`
 //	}
-//
-// * implement SheetModel interface
-//
-//	func (u User) SheetName() string {
-//		 return "user"
+//	// implement SheetModel interface
+//	func (u Foo) SheetName() string {
+//		return "foo sheet name"
 //	}
-//
-// * append data to excel file
-//
-//	var sheetModels []SheetModel{
-//		 User{
-//		   ID:   1,
-//		   Name: "张三",
-//		   Age:  18,
-//		 },
-//		 User{
-//		   ID:   2,
-//		   Name: "李四",
-//		   Age:  20,
-//		 },
+//	//append data to excel file
+//	bar1DeletedAt := time.Date(2024, 1, 3, 15, 4, 5, 0, time.Local)
+//	sheetModels := []excelorm.SheetModel{
+//		Foo{
+//			ID:   1,
+//			Name: "Bar1",
+//			CreatedAt: time.Date(2024, 1, 2, 15, 4, 5, 0, time.Local),
+//			DeletedAt: &bar1DeletedAt,
+//		},
+//		Foo{
+//			ID:   2,
+//			Name: "Bar2",
+//			CreatedAt: time.Date(2024, 1, 2, 15, 4, 5, 0, time.Local),
+//		},
 //	}
-//
-// * build Excel file
-// err := WriteExcelSaveAs("user.xlsx", sheetModels, WithTimeFormatLayout("2006/01/02 15:04:05"))
-//
-//	if err != nil {
+//	//build Excel file
+// 	if err := excelorm.WriteExcelSaveAs("foo.xlsx", sheetModels,
+//		excelorm.WithTimeFormatLayout("2006/01/02 15:04:05"),
+//		excelorm.WithIfNullValue("-"),
+//	); err != nil {
 //		 log.Fatal(err)
 //	}
-//
-// * Multi-sheets
-// define more structs which implement SheetModel interface
-// then construct any of their objects to append to sheetModels
-// different sheetModel better have different sheet name to avoid confusion
-// rows ordered in Excel file is the same as sheetModels
+//  // After that code execute, you will get `foo.xlsx` file with named `foo sheet name`,
+//	// It's content like next:
+//	+-------------------------------------------------------+
+//	| id | name |          created_at |          deleted_at |
+//	+-------------------------------------------------------+
+//	|  1 | Bar1 | 2024/01/02 15:04:05 | 2024/01/03 15:04:05 |
+//	|  2 | Bar2 | 2024/01/02 15:04:05 |                   - |
+//	+-------------------------------------------------------+
+//	// Multi-sheets
+//	// define more structs which implement SheetModel interface
+//	// then construct any of their objects to append to sheetModels
+//	// different sheetModel better have different sheet name to avoid confusion
+//	// rows ordered in Excel file is the same as sheetModels
 func WriteExcelSaveAs(fileName string, sheetModels []SheetModel, opts ...Option) error {
+	time.Date(2024, 1, 2, 15, 4, 5, 0, time.Local)
 	if fileName == "" {
 		return errors.New("fileName can not be empty")
 	}
@@ -66,7 +72,6 @@ func WriteExcelSaveAs(fileName string, sheetModels []SheetModel, opts ...Option)
 	return f.SaveAs(fileName)
 }
 
-// WriteExcelAsBytesBuffer generate excel and save as excelize.File
 func write(sheetModels []SheetModel, opts ...Option) (*excelize.File, error) {
 	// default options
 	options := &options{
@@ -176,7 +181,7 @@ func setNoDataSheetHeaders(f *excelize.File, options *options) error {
 	return nil
 }
 
-// WriteExcelAsBytesBuffer generate excel and save as bytes.Buffer
+// WriteExcelAsBytesBuffer generate excel and save as excelize.File
 func WriteExcelAsBytesBuffer(sheetModels []SheetModel, opts ...Option) (*bytes.Buffer, error) {
 	buffer := new(bytes.Buffer)
 	f, err := write(sheetModels, opts...)
@@ -206,6 +211,7 @@ type options struct {
 	headless         bool         // 是否显示表头
 }
 
+// WithTimeFormatLayout 时间类型的格式化版图
 func WithTimeFormatLayout(layout string) Option {
 	return func(options *options) {
 		options.timeFormatLayout = layout
@@ -224,6 +230,7 @@ func WithFloatFmt(fmt byte) Option {
 	}
 }
 
+// WithIfNullValue 当数据为nil时展示内容
 func WithIfNullValue(value string) Option {
 	return func(options *options) {
 		options.ifNullValue = value
@@ -237,7 +244,7 @@ func WithSheetHeaders(headers ...SheetModel) Option {
 	}
 }
 
-// WithBoolValueAs 当字段类型为bool时，true和false的显示值
+// WithBoolValueAs 当字段类型为bool时，true和false的展示内容
 func WithBoolValueAs(trueValue, falseValue string) Option {
 	return func(options *options) {
 		options.trueValue = &trueValue
