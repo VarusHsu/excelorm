@@ -1,5 +1,5 @@
 # excelorm
-a easier use excel file create tool for golang
+A easier use excel file create tool for golang
 
 ## install
 ```shell
