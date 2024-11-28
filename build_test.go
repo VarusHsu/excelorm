@@ -2,6 +2,7 @@ package excelorm
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
@@ -122,13 +123,13 @@ func TestWriteExcel(t *testing.T) {
 
 	models = append(models, sheet3)
 	err = WriteExcelSaveAs("test2.xlsx", models)
-	assert.EqualError(t, err, "sheetModel must have a sheet name")
+	require.EqualError(t, err, "sheetModel must have a sheet name")
 
 	sheet4 := Sheet4(1)
 	models = make([]SheetModel, 0)
 	models = append(models, sheet4)
 	err = WriteExcelSaveAs("test3.xlsx", models)
-	assert.EqualError(t, err, "sheetModel must be struct")
+	require.EqualError(t, err, "sheetModel must be struct")
 
 	sheet5 := Sheet5{
 		Col1: "string",
@@ -144,10 +145,10 @@ func TestWriteExcel(t *testing.T) {
 	}
 	models = make([]SheetModel, 0)
 	models = append(models, sheet6)
-	assert.Equal(t, err, nil)
+	assert.NoErrorf(t, err, "")
 
 	err = WriteExcelSaveAs("test5.xlsx", models)
-	assert.EqualError(t, err, "unsupported type map")
+	require.EqualError(t, err, "unsupported type map")
 
 	sheet7 := Sheet7{
 		SubStruct: subStruct{
@@ -386,6 +387,6 @@ func TestAppendNilRow(t *testing.T) {
 	var models []SheetModel
 	models = append(models, nil)
 	err := WriteExcelSaveAs("test16.xlsx", models)
-	assert.EqualError(t, err, "nil reference row append is not allowed")
+	require.EqualError(t, err, "nil reference row append is not allowed")
 
 }
