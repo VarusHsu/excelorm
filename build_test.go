@@ -144,6 +144,8 @@ func TestWriteExcel(t *testing.T) {
 	}
 	models = make([]SheetModel, 0)
 	models = append(models, sheet6)
+	assert.Equal(t, err, nil)
+
 	err = WriteExcelSaveAs("test5.xlsx", models)
 	assert.EqualError(t, err, "unsupported type map")
 

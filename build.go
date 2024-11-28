@@ -14,52 +14,53 @@ type Option func(*options)
 
 // WriteExcelSaveAs 生成excel文件并保存到本地
 // example usage:
-//	//define a struct
-//	type Foo struct {
-//		ID        int64      `excel_header:"id"`
-//		Name      string     `excel_header:"name"`
-//		CreatedAt time.Time  `excel_header:"created_at"`
-//		DeletedAt *time.Time `excel_header:"deleted_at"`
-//	}
-//	// implement SheetModel interface
-//	func (u Foo) SheetName() string {
-//		return "foo sheet name"
-//	}
-//	//append data to excel file
-//	bar1DeletedAt := time.Date(2024, 1, 3, 15, 4, 5, 0, time.Local)
-//	sheetModels := []excelorm.SheetModel{
-//		Foo{
-//			ID:   1,
-//			Name: "Bar1",
-//			CreatedAt: time.Date(2024, 1, 2, 15, 4, 5, 0, time.Local),
-//			DeletedAt: &bar1DeletedAt,
-//		},
-//		Foo{
-//			ID:   2,
-//			Name: "Bar2",
-//			CreatedAt: time.Date(2024, 1, 2, 15, 4, 5, 0, time.Local),
-//		},
-//	}
-//	//build Excel file
-// 	if err := excelorm.WriteExcelSaveAs("foo.xlsx", sheetModels,
-//		excelorm.WithTimeFormatLayout("2006/01/02 15:04:05"),
-//		excelorm.WithIfNullValue("-"),
-//	); err != nil {
-//		 log.Fatal(err)
-//	}
-//  // After that code execute, you will get `foo.xlsx` file with named `foo sheet name`,
-//	// It's content like next:
-//	+-------------------------------------------------------+
-//	| id | name |          created_at |          deleted_at |
-//	+-------------------------------------------------------+
-//	|  1 | Bar1 | 2024/01/02 15:04:05 | 2024/01/03 15:04:05 |
-//	|  2 | Bar2 | 2024/01/02 15:04:05 |                   - |
-//	+-------------------------------------------------------+
-//	// Multi-sheets
-//	// define more structs which implement SheetModel interface
-//	// then construct any of their objects to append to sheetModels
-//	// different sheetModel better have different sheet name to avoid confusion
-//	// rows ordered in Excel file is the same as sheetModels
+//
+//		//define a struct
+//		type Foo struct {
+//			ID        int64      `excel_header:"id"`
+//			Name      string     `excel_header:"name"`
+//			CreatedAt time.Time  `excel_header:"created_at"`
+//			DeletedAt *time.Time `excel_header:"deleted_at"`
+//		}
+//		// implement SheetModel interface
+//		func (u Foo) SheetName() string {
+//			return "foo sheet name"
+//		}
+//		//append data to excel file
+//		bar1DeletedAt := time.Date(2024, 1, 3, 15, 4, 5, 0, time.Local)
+//		sheetModels := []excelorm.SheetModel{
+//			Foo{
+//				ID:   1,
+//				Name: "Bar1",
+//				CreatedAt: time.Date(2024, 1, 2, 15, 4, 5, 0, time.Local),
+//				DeletedAt: &bar1DeletedAt,
+//			},
+//			Foo{
+//				ID:   2,
+//				Name: "Bar2",
+//				CreatedAt: time.Date(2024, 1, 2, 15, 4, 5, 0, time.Local),
+//			},
+//		}
+//		//build Excel file
+//		if err := excelorm.WriteExcelSaveAs("foo.xlsx", sheetModels,
+//			excelorm.WithTimeFormatLayout("2006/01/02 15:04:05"),
+//			excelorm.WithIfNullValue("-"),
+//		); err != nil {
+//			 log.Fatal(err)
+//		}
+//	 // After that code execute, you will get `foo.xlsx` file with named `foo sheet name`,
+//		// It's content like next:
+//		+-------------------------------------------------------+
+//		| id | name |          created_at |          deleted_at |
+//		+-------------------------------------------------------+
+//		|  1 | Bar1 | 2024/01/02 15:04:05 | 2024/01/03 15:04:05 |
+//		|  2 | Bar2 | 2024/01/02 15:04:05 |                   - |
+//		+-------------------------------------------------------+
+//		// Multi-sheets
+//		// define more structs which implement SheetModel interface
+//		// then construct any of their objects to append to sheetModels
+//		// different sheetModel better have different sheet name to avoid confusion
+//		// rows ordered in Excel file is the same as sheetModels
 func WriteExcelSaveAs(fileName string, sheetModels []SheetModel, opts ...Option) error {
 	time.Date(2024, 1, 2, 15, 4, 5, 0, time.Local)
 	if fileName == "" {
@@ -324,8 +325,8 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 		case reflect.Struct, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
 			reflect.String, reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 			reflect.Float32, reflect.Float64:
-			value := fieldValue.Interface() // get field value (type interface{})
-			switch value.(type) {           // type assertion
+			valueInterface := fieldValue.Interface() // get field value (type interface{})
+			switch value := valueInterface.(type) {  // type assertion
 			case int, int8, int16, int32, int64:
 				if options.integerAsString {
 					f.SetCellValue(sheetName, cellName, strconv.FormatInt(fieldValue.Int(), 10)) // set int cell value
@@ -341,10 +342,9 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 			case string:
 				f.SetCellValue(sheetName, cellName, value) // set string cell value
 			case bool: // convert bool to string using options
-				b := value.(bool)
-				if options.trueValue != nil && b { // if trueValue is set and value is true
+				if options.trueValue != nil && value { // if trueValue is set and value is true
 					f.SetCellValue(sheetName, cellName, *options.trueValue)
-				} else if options.falseValue != nil && !b { // if falseValue is set and value is false
+				} else if options.falseValue != nil && !value { // if falseValue is set and value is false
 					f.SetCellValue(sheetName, cellName, *options.falseValue)
 				} else { // using default
 					f.SetCellValue(sheetName, cellName, value)
@@ -353,7 +353,7 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 				f.SetCellValue(sheetName,
 					cellName,
 					strconv.FormatFloat(
-						float64(value.(float32)),
+						float64(value),
 						options.floatFmt,
 						options.floatPrecision,
 						32,
@@ -363,14 +363,14 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 				f.SetCellValue(sheetName,
 					cellName,
 					strconv.FormatFloat(
-						value.(float64),
+						value,
 						options.floatFmt,
 						options.floatPrecision,
 						64,
 					),
 				)
 			case time.Time: // convert time.Time to string using options
-				f.SetCellValue(sheetName, cellName, value.(time.Time).Format(options.timeFormatLayout))
+				f.SetCellValue(sheetName, cellName, value.Format(options.timeFormatLayout))
 			default:
 				return fmt.Errorf("unsupported type %T", value)
 			}
