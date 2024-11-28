@@ -15,52 +15,52 @@ type Option func(*options)
 // WriteExcelSaveAs 生成excel文件并保存到本地
 // example usage:
 //
-//		//define a struct
-//		type Foo struct {
-//			ID        int64      `excel_header:"id"`
-//			Name      string     `excel_header:"name"`
-//			CreatedAt time.Time  `excel_header:"created_at"`
-//			DeletedAt *time.Time `excel_header:"deleted_at"`
-//		}
-//		// implement SheetModel interface
-//		func (u Foo) SheetName() string {
-//			return "foo sheet name"
-//		}
-//		//append data to excel file
-//		bar1DeletedAt := time.Date(2024, 1, 3, 15, 4, 5, 0, time.Local)
-//		sheetModels := []excelorm.SheetModel{
-//			Foo{
-//				ID:   1,
-//				Name: "Bar1",
-//				CreatedAt: time.Date(2024, 1, 2, 15, 4, 5, 0, time.Local),
-//				DeletedAt: &bar1DeletedAt,
-//			},
-//			Foo{
-//				ID:   2,
-//				Name: "Bar2",
-//				CreatedAt: time.Date(2024, 1, 2, 15, 4, 5, 0, time.Local),
-//			},
-//		}
-//		//build Excel file
-//		if err := excelorm.WriteExcelSaveAs("foo.xlsx", sheetModels,
-//			excelorm.WithTimeFormatLayout("2006/01/02 15:04:05"),
-//			excelorm.WithIfNullValue("-"),
-//		); err != nil {
-//			 log.Fatal(err)
-//		}
-//	 // After that code execute, you will get `foo.xlsx` file with named `foo sheet name`,
-//		// It's content like next:
-//		+-------------------------------------------------------+
-//		| id | name |          created_at |          deleted_at |
-//		+-------------------------------------------------------+
-//		|  1 | Bar1 | 2024/01/02 15:04:05 | 2024/01/03 15:04:05 |
-//		|  2 | Bar2 | 2024/01/02 15:04:05 |                   - |
-//		+-------------------------------------------------------+
-//		// Multi-sheets
-//		// define more structs which implement SheetModel interface
-//		// then construct any of their objects to append to sheetModels
-//		// different sheetModel better have different sheet name to avoid confusion
-//		// rows ordered in Excel file is the same as sheetModels
+//	//define a struct
+//	type Foo struct {
+//		ID        int64      `excel_header:"id"`
+//		Name      string     `excel_header:"name"`
+//		CreatedAt time.Time  `excel_header:"created_at"`
+//		DeletedAt *time.Time `excel_header:"deleted_at"`
+//	}
+//	// implement SheetModel interface
+//	func (u Foo) SheetName() string {
+//		return "foo sheet name"
+//	}
+//	//append data to excel file
+//	bar1DeletedAt := time.Date(2024, 1, 3, 15, 4, 5, 0, time.Local)
+//	sheetModels := []excelorm.SheetModel{
+//		Foo{
+//			ID:   1,
+//			Name: "Bar1",
+//			CreatedAt: time.Date(2024, 1, 2, 15, 4, 5, 0, time.Local),
+//			DeletedAt: &bar1DeletedAt,
+//		},
+//		Foo{
+//			ID:   2,
+//			Name: "Bar2",
+//			CreatedAt: time.Date(2024, 1, 2, 15, 4, 5, 0, time.Local),
+//		},
+//	}
+//	//build Excel file
+//	if err := excelorm.WriteExcelSaveAs("foo.xlsx", sheetModels,
+//		excelorm.WithTimeFormatLayout("2006/01/02 15:04:05"),
+//		excelorm.WithIfNullValue("-"),
+//	); err != nil {
+//		 log.Fatal(err)
+//	}
+//	// After that code execute, you will get `foo.xlsx` file with named `foo sheet name`,
+//	// It's content like next:
+//	+-------------------------------------------------------+
+//	| id | name |          created_at |          deleted_at |
+//	+-------------------------------------------------------+
+//	|  1 | Bar1 | 2024/01/02 15:04:05 | 2024/01/03 15:04:05 |
+//	|  2 | Bar2 | 2024/01/02 15:04:05 |                   - |
+//	+-------------------------------------------------------+
+//	// Multi-sheets
+//	// define more structs which implement SheetModel interface
+//	// then construct any of their objects to append to sheetModels
+//	// different sheetModel better have different sheet name to avoid confusion
+//	// rows ordered in Excel file is the same as sheetModels
 func WriteExcelSaveAs(fileName string, sheetModels []SheetModel, opts ...Option) error {
 	time.Date(2024, 1, 2, 15, 4, 5, 0, time.Local)
 	if fileName == "" {
