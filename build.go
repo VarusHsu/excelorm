@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/360EntSecGroup-Skylar/excelize"
+	"github.com/xuri/excelize/v2"
 )
 
 type Option func(*options)
@@ -63,7 +63,6 @@ type Option func(*options)
 //	// different sheetModel better have different sheet name to avoid confusion
 //	// rows ordered in Excel file is the same as sheetModels
 func WriteExcelSaveAs(fileName string, sheetModels []SheetModel, opts ...Option) error {
-	time.Date(2024, 1, 2, 15, 4, 5, 0, time.Local)
 	if fileName == "" {
 		return errors.New("fileName can not be empty")
 	}
@@ -134,7 +133,10 @@ func write(sheetModels []SheetModel, opts ...Option) (*excelize.File, error) {
 		}
 	}
 	if !containsModelSheetNameEqSheet1 {
-		f.DeleteSheet("Sheet1")
+		err := f.DeleteSheet("Sheet1")
+		if err != nil {
+			return nil, err
+		}
 	}
 	return f, nil
 }
@@ -146,12 +148,17 @@ func setNoDataSheetHeaders(f *excelize.File, options *options) error {
 	}
 	for _, model := range models {
 		sheetName := model.SheetName()
-		idx := f.GetSheetIndex(sheetName)
-		if idx != 0 {
+		idx, err := f.GetSheetIndex(sheetName)
+		if err != nil {
+			return err
+		}
+		if idx != -1 {
 			// sheet exists, continue
 			continue
 		}
-		f.NewSheet(sheetName)
+		if _, err = f.NewSheet(sheetName); err != nil {
+			return err
+		}
 
 		// check if sheetModel is pointer
 		if reflect.TypeOf(model).Kind() == reflect.Ptr {
@@ -177,7 +184,9 @@ func setNoDataSheetHeaders(f *excelize.File, options *options) error {
 			if err != nil {
 				return err
 			}
-			f.SetCellValue(sheetName, cellName, header) // set header
+			if err = f.SetCellValue(sheetName, cellName, header); err != nil { // set header
+				return err
+			}
 		}
 	}
 	return nil
@@ -271,9 +280,14 @@ func WithHeadless() Option {
 func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *options) error {
 	sheetName := sheetModel.SheetName()
 	// find if sheetName exists
-	sheetIndex := f.GetSheetIndex(sheetName)
-	if sheetIndex == 0 {
-		f.NewSheet(sheetName) // create sheet
+	idx, err := f.GetSheetIndex(sheetName)
+	if err != nil {
+		return err
+	}
+	if idx != -1 {
+		if _, err = f.NewSheet(sheetName); err != nil { // create sheet
+			return err
+		}
 	}
 	// check if sheetModel is pointer
 	if reflect.TypeOf(sheetModel).Kind() == reflect.Ptr {
@@ -299,7 +313,9 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 			if err != nil {
 				return err
 			}
-			f.SetCellValue(sheetName, cellName, header) // set header
+			if err = f.SetCellValue(sheetName, cellName, header); err != nil { // set header
+				return err
+			}
 		}
 		line++ // set data first line
 	}
@@ -317,7 +333,9 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 		case reflect.Pointer: // if field is pointer, get its value
 			canAddr := fieldValue.Elem().CanAddr() // check if can get its value
 			if !canAddr {
-				f.SetCellValue(sheetName, cellName, options.ifNullValue) // null pointer
+				if err = f.SetCellValue(sheetName, cellName, options.ifNullValue); err != nil { // null pointer
+					return err
+				}
 			} else {
 				fieldValue = reflect.Indirect(fieldValue) // get value of pointer point to
 				fieldKind = fieldValue.Kind()             // get kind of pointer point to
@@ -330,28 +348,44 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 			switch value := valueInterface.(type) {  // type assertion
 			case int, int8, int16, int32, int64:
 				if options.integerAsString {
-					f.SetCellValue(sheetName, cellName, strconv.FormatInt(fieldValue.Int(), 10)) // set int cell value
+					if err = f.SetCellValue(sheetName, cellName, strconv.FormatInt(fieldValue.Int(), 10)); err != nil { // set int cell value
+						return err
+					}
 				} else {
-					f.SetCellValue(sheetName, cellName, value)
+					if err = f.SetCellValue(sheetName, cellName, value); err != nil {
+						return err
+					}
 				}
 			case uint, uint8, uint16, uint32, uint64:
 				if options.integerAsString {
-					f.SetCellValue(sheetName, cellName, strconv.FormatUint(fieldValue.Uint(), 10)) // set uint cell value
+					if err = f.SetCellValue(sheetName, cellName, strconv.FormatUint(fieldValue.Uint(), 10)); err != nil { // set uint cell value
+						return err
+					}
 				} else {
-					f.SetCellValue(sheetName, cellName, value)
+					if err = f.SetCellValue(sheetName, cellName, value); err != nil {
+						return err
+					}
 				}
 			case string:
-				f.SetCellValue(sheetName, cellName, value) // set string cell value
+				if err = f.SetCellValue(sheetName, cellName, value); err != nil { // set string cell value
+					return err
+				}
 			case bool: // convert bool to string using options
 				if options.trueValue != nil && value { // if trueValue is set and value is true
-					f.SetCellValue(sheetName, cellName, *options.trueValue)
+					if err = f.SetCellValue(sheetName, cellName, *options.trueValue); err != nil {
+						return err
+					}
 				} else if options.falseValue != nil && !value { // if falseValue is set and value is false
-					f.SetCellValue(sheetName, cellName, *options.falseValue)
+					if err = f.SetCellValue(sheetName, cellName, *options.falseValue); err != nil {
+						return err
+					}
 				} else { // using default
-					f.SetCellValue(sheetName, cellName, value)
+					if err = f.SetCellValue(sheetName, cellName, value); err != nil {
+						return err
+					}
 				}
 			case float32: // convert float32 to string using options
-				f.SetCellValue(sheetName,
+				if err = f.SetCellValue(sheetName,
 					cellName,
 					strconv.FormatFloat(
 						float64(value),
@@ -359,9 +393,11 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 						options.floatPrecision,
 						32,
 					),
-				)
+				); err != nil {
+					return err
+				}
 			case float64: // convert float64 to string using options
-				f.SetCellValue(sheetName,
+				if err = f.SetCellValue(sheetName,
 					cellName,
 					strconv.FormatFloat(
 						value,
@@ -369,9 +405,13 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 						options.floatPrecision,
 						64,
 					),
-				)
+				); err != nil {
+					return err
+				}
 			case time.Time: // convert time.Time to string using options
-				f.SetCellValue(sheetName, cellName, value.Format(options.timeFormatLayout))
+				if err = f.SetCellValue(sheetName, cellName, value.Format(options.timeFormatLayout)); err != nil {
+					return err
+				}
 			default:
 				return fmt.Errorf("unsupported type %T", value)
 			}
