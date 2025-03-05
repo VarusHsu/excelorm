@@ -27,6 +27,15 @@ jobs:
     - name: Test
       run: go test -v ./...
 
+    - name: Coverage
+      run: go test -coverprofile=coverage.txt
+
+    - name: "Upload coverage reports to Codecov"
+      uses: codecov/codecov-action@v5
+      with:
+        token: 4ef16850-a806-4e2d-9f53-b00829214503
+        slug: VarusHsu/excelorm
+
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -43,3 +52,4 @@ jobs:
         with:
           version: v1.61.0
           args: --verbose
+
