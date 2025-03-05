@@ -1,4 +1,10 @@
 # excelorm
+![Code Coverage](https://img.shields.io/codecov/c/github/varushsu/excelorm.svg)
+![Build Status](https://github.com/varushsu/excelorm/actions/workflows/go.yml/badge.svg)
+![Github Release](https://img.shields.io/github/v/release/varushsu/excelorm)
+![GitHub](https://img.shields.io/github/license/varushsu/excelorm)
+![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https://github.com/varushsu/excelorm)
+
 A easier use excel file create tool for golang
 
 ## install
