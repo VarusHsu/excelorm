@@ -284,7 +284,7 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 	if err != nil {
 		return err
 	}
-	if idx != -1 {
+	if idx == -1 {
 		if _, err = f.NewSheet(sheetName); err != nil { // create sheet
 			return err
 		}
