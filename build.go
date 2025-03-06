@@ -98,7 +98,6 @@ func write(sheetModels []SheetModel, opts ...Option) (*excelize.File, error) {
 		timeFormatLayout: "2006-01-02 15:04:05",
 		floatPrecision:   2,
 		floatFmt:         'f',
-		ifNullValue:      "",
 	}
 
 	// apply options
@@ -107,7 +106,8 @@ func write(sheetModels []SheetModel, opts ...Option) (*excelize.File, error) {
 	}
 
 	f := excelize.NewFile()
-	sheetLinesCount := make(map[string]int)
+	swMap := make(map[string]*excelize.StreamWriter)
+	lineNumMap := make(map[string]int)
 	for _, sheetModel := range sheetModels {
 		if sheetModel == nil {
 			return nil, errors.New("nil reference row append is not allowed")
@@ -118,16 +118,24 @@ func write(sheetModels []SheetModel, opts ...Option) (*excelize.File, error) {
 		}
 
 		modelKind := reflect.TypeOf(sheetModel).Kind()
-		switch modelKind {
-		case reflect.Struct:
-			l := sheetLinesCount[sheetName]
-			err := appendRow(f, sheetModel, l, options)
-			if err != nil {
+		line := lineNumMap[sheetName]
+		sw, ok := swMap[sheetName]
+		if !ok {
+			var err error
+			if _, err = f.NewSheet(sheetName); err != nil {
 				return nil, err
 			}
-			sheetLinesCount[sheetName]++
-			if l == 0 && !options.headless { // first line is header, so counter increase again
-				sheetLinesCount[sheetName]++
+			if sw, err = f.NewStreamWriter(sheetName); err != nil {
+				return nil, err
+			}
+			swMap[sheetName] = sw
+		}
+		lineNumMap[sheetName]++
+		switch modelKind {
+		case reflect.Struct:
+			err := appendRow(sw, sheetModel, line, options)
+			if err != nil {
+				return nil, err
 			}
 		default:
 			return nil, errors.New("sheetModel must be struct")
@@ -137,6 +145,12 @@ func write(sheetModels []SheetModel, opts ...Option) (*excelize.File, error) {
 	if err != nil {
 		return nil, err
 	}
+	for _, sw := range swMap {
+		if err = sw.Flush(); err != nil {
+			return nil, err
+		}
+	}
+
 	// delete default sheet
 	var containsModelSheetNameEqSheet1 bool
 	for _, sheetModel := range sheetModels {
@@ -296,18 +310,7 @@ func WithHeadless() Option {
 	}
 }
 
-func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *options) error {
-	sheetName := sheetModel.SheetName()
-	// find if sheetName exists
-	idx, err := f.GetSheetIndex(sheetName)
-	if err != nil {
-		return err
-	}
-	if idx == -1 {
-		if _, err = f.NewSheet(sheetName); err != nil { // create sheet
-			return err
-		}
-	}
+func appendRow(sw *excelize.StreamWriter, sheetModel SheetModel, line int, options *options) error {
 	// check if sheetModel is pointer
 	if reflect.TypeOf(sheetModel).Kind() == reflect.Ptr {
 		if reflect.ValueOf(sheetModel).Elem().CanAddr() { // check if sheetModel is nil
@@ -322,29 +325,34 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 	modelType := reflect.TypeOf(sheetModel)
 	line++                              // index start from 0 but excel start from 1
 	if line == 1 && !options.headless { // set header
+		var values []any
 		for i := 0; i < modelType.NumField(); i++ {
 			field := modelType.Field(i)
-			header := field.Tag.Get("excel_header")
+			header := field.Tag.Get("excelorm")
+			if header == "" { // Deprecated
+				header = field.Tag.Get("excel_header")
+			}
 			if header == "" { // if no excel_header tag, use field name as header
 				header = field.Name
 			}
-			cellName, err := coordinatesToCellName(i+1, 1)
-			if err != nil {
-				return err
-			}
-			if err = f.SetCellValue(sheetName, cellName, header); err != nil { // set header
-				return err
-			}
+			values = append(values, header)
 		}
-		line++ // set data first line
-	}
-	for i := 0; i < modelType.NumField(); i++ {
-		field := modelType.Field(i)
-		cellName, err := coordinatesToCellName(i+1, line)
+		cellName, err := coordinatesToCellName(1, line)
 		if err != nil {
 			return err
 		}
+		if err = sw.SetRow(cellName, values); err != nil { // set header
+			return err
+		}
+	}
 
+	if !options.headless {
+		line++
+	}
+
+	var values = make([]any, 0, modelType.NumField())
+	for i := 0; i < modelType.NumField(); i++ {
+		field := modelType.Field(i)
 		fieldValue := reflect.ValueOf(sheetModel).Field(i) // get field value
 		fieldKind := field.Type.Kind()                     // get field kind
 	unAddrTo:
@@ -352,9 +360,7 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 		case reflect.Pointer: // if field is pointer, get its value
 			canAddr := fieldValue.Elem().CanAddr() // check if can get its value
 			if !canAddr {
-				if err = f.SetCellValue(sheetName, cellName, options.ifNullValue); err != nil { // null pointer
-					return err
-				}
+				values = append(values, options.ifNullValue)
 			} else {
 				fieldValue = reflect.Indirect(fieldValue) // get value of pointer point to
 				fieldKind = fieldValue.Kind()             // get kind of pointer point to
@@ -367,70 +373,33 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 			switch value := valueInterface.(type) {  // type assertion
 			case int, int8, int16, int32, int64:
 				if options.integerAsString {
-					if err = f.SetCellValue(sheetName, cellName, strconv.FormatInt(fieldValue.Int(), 10)); err != nil { // set int cell value
-						return err
-					}
+					values = append(values, strconv.FormatInt(fieldValue.Int(), 10)) // set int cell value
 				} else {
-					if err = f.SetCellValue(sheetName, cellName, value); err != nil {
-						return err
-					}
+					values = append(values, value) // set string (converted) cell value
 				}
 			case uint, uint8, uint16, uint32, uint64:
 				if options.integerAsString {
-					if err = f.SetCellValue(sheetName, cellName, strconv.FormatUint(fieldValue.Uint(), 10)); err != nil { // set uint cell value
-						return err
-					}
+					values = append(values, strconv.FormatUint(fieldValue.Uint(), 10)) // set uint cell value
 				} else {
-					if err = f.SetCellValue(sheetName, cellName, value); err != nil {
-						return err
-					}
+					values = append(values, value) // set string (converted) cell value
 				}
 			case string:
-				if err = f.SetCellValue(sheetName, cellName, value); err != nil { // set string cell value
-					return err
-				}
+				values = append(values, value) // set string cell value
 			case bool: // convert bool to string using options
 				if options.trueValue != nil && value { // if trueValue is set and value is true
-					if err = f.SetCellValue(sheetName, cellName, *options.trueValue); err != nil {
-						return err
-					}
+					values = append(values, *options.trueValue)
 				} else if options.falseValue != nil && !value { // if falseValue is set and value is false
-					if err = f.SetCellValue(sheetName, cellName, *options.falseValue); err != nil {
-						return err
-					}
+					values = append(values, *options.falseValue)
 				} else { // using default
-					if err = f.SetCellValue(sheetName, cellName, value); err != nil {
-						return err
-					}
+					values = append(values, value)
+
 				}
 			case float32: // convert float32 to string using options
-				if err = f.SetCellValue(sheetName,
-					cellName,
-					strconv.FormatFloat(
-						float64(value),
-						options.floatFmt,
-						options.floatPrecision,
-						32,
-					),
-				); err != nil {
-					return err
-				}
+				values = append(values, strconv.FormatFloat(float64(value), options.floatFmt, options.floatPrecision, 32))
 			case float64: // convert float64 to string using options
-				if err = f.SetCellValue(sheetName,
-					cellName,
-					strconv.FormatFloat(
-						value,
-						options.floatFmt,
-						options.floatPrecision,
-						64,
-					),
-				); err != nil {
-					return err
-				}
+				values = append(values, strconv.FormatFloat(value, options.floatFmt, options.floatPrecision, 32))
 			case time.Time: // convert time.Time to string using options
-				if err = f.SetCellValue(sheetName, cellName, value.Format(options.timeFormatLayout)); err != nil {
-					return err
-				}
+				values = append(values, value.Format(options.timeFormatLayout))
 			default:
 				return fmt.Errorf("unsupported type %T", value)
 			}
@@ -439,6 +408,13 @@ func appendRow(f *excelize.File, sheetModel SheetModel, line int, options *optio
 			reflect.Invalid, reflect.UnsafePointer, reflect.Complex64, reflect.Complex128, reflect.Uintptr:
 			return fmt.Errorf("unsupported type %s", fieldKind)
 		}
+	}
+	cellName, err := coordinatesToCellName(1, line)
+	if err != nil {
+		return err
+	}
+	if err = sw.SetRow(cellName, values); err != nil {
+		return err
 	}
 	return nil
 }
