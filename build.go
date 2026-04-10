@@ -81,7 +81,7 @@ type Option func(*options)
 //	// then construct any of their objects to append to sheetModels
 //	// different sheetModel better have different sheet name to avoid confusion
 //	// rows ordered in Excel file is the same as sheetModels
-func WriteExcelSaveAs(fileName string, sheetModels []SheetModel, opts ...Option) error {
+func WriteExcelSaveAs(fileName string, sheetModels []SheetModel, opts ...Option) (retErr error) {
 	if fileName == "" {
 		return errors.New("fileName can not be empty")
 	}
@@ -89,7 +89,11 @@ func WriteExcelSaveAs(fileName string, sheetModels []SheetModel, opts ...Option)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && retErr == nil {
+			retErr = closeErr
+		}
+	}()
 	return f.SaveAs(fileName)
 }
 
@@ -233,13 +237,17 @@ func setNoDataSheetHeaders(f *excelize.File, options *options) error {
 }
 
 // WriteExcelAsBytesBuffer 生成excel并保存为 bytes.Buffer, 用法同 WriteExcelSaveAs
-func WriteExcelAsBytesBuffer(sheetModels []SheetModel, opts ...Option) (*bytes.Buffer, error) {
+func WriteExcelAsBytesBuffer(sheetModels []SheetModel, opts ...Option) (buf *bytes.Buffer, retErr error) {
 	buffer := new(bytes.Buffer)
 	f, err := write(sheetModels, opts...)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && retErr == nil {
+			retErr = closeErr
+		}
+	}()
 	err = f.Write(buffer)
 	if err != nil {
 		return nil, err
