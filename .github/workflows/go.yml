@@ -14,12 +14,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
-        go-version: '1.20'
+        go-version: '1.21'
 
     - name: Init
       run: go mod tidy
@@ -33,7 +33,7 @@ jobs:
     - name: "Upload coverage reports to Codecov"
       uses: codecov/codecov-action@v5
       with:
-        token: 4ef16850-a806-4e2d-9f53-b00829214503
+        token: ${{ secrets.CODECOV_TOKEN }}
         slug: VarusHsu/excelorm
 
   lint:

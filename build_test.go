@@ -104,6 +104,7 @@ func (Sheet7) SheetName() string {
 }
 
 func TestWriteExcel(t *testing.T) {
+	dir := t.TempDir()
 	sheet1 := Sheet1{
 		Col1:  "string",
 		Col2:  1,
@@ -132,7 +133,7 @@ func TestWriteExcel(t *testing.T) {
 	var models []SheetModel
 	models = append(models, sheet1, sheet1, sheet1, sheet1, sheet1, sheet2, sheet2, sheet2, sheet2, sheet2)
 
-	err := WriteExcelSaveAs("test1.xlsx", models)
+	err := WriteExcelSaveAs(dir+"/test1.xlsx", models)
 	if err != nil {
 		t.Error(err)
 	}
@@ -142,13 +143,13 @@ func TestWriteExcel(t *testing.T) {
 	}
 
 	models = append(models, sheet3)
-	err = WriteExcelSaveAs("test2.xlsx", models)
+	err = WriteExcelSaveAs(dir+"/test2.xlsx", models)
 	require.EqualError(t, err, "sheetModel must have a sheet name")
 
 	sheet4 := Sheet4(1)
 	models = make([]SheetModel, 0)
 	models = append(models, sheet4)
-	err = WriteExcelSaveAs("test3.xlsx", models)
+	err = WriteExcelSaveAs(dir+"/test3.xlsx", models)
 	require.EqualError(t, err, "sheetModel must be struct")
 
 	sheet5 := Sheet5{
@@ -156,7 +157,7 @@ func TestWriteExcel(t *testing.T) {
 	}
 	models = make([]SheetModel, 0)
 	models = append(models, sheet5)
-	err = WriteExcelSaveAs("test4.xlsx", models)
+	err = WriteExcelSaveAs(dir+"/test4.xlsx", models)
 
 	sheet6 := Sheet6{
 		Col1: map[string]string{
@@ -167,7 +168,7 @@ func TestWriteExcel(t *testing.T) {
 	models = append(models, sheet6)
 	require.NoErrorf(t, err, "")
 
-	err = WriteExcelSaveAs("test5.xlsx", models)
+	err = WriteExcelSaveAs(dir+"/test5.xlsx", models)
 	require.EqualError(t, err, "unsupported type map")
 
 	sheet7 := Sheet7{
@@ -177,11 +178,12 @@ func TestWriteExcel(t *testing.T) {
 	}
 	models = make([]SheetModel, 0)
 	models = append(models, sheet7)
-	err = WriteExcelSaveAs("test6.xlsx", models)
+	err = WriteExcelSaveAs(dir+"/test6.xlsx", models)
 	assert.EqualError(t, err, "unsupported type excelorm.subStruct")
 }
 
 func TestWithTimeFormatLayout(t *testing.T) {
+	dir := t.TempDir()
 	sheet1 := Sheet1{
 		Col1:  "string",
 		Col2:  1,
@@ -210,13 +212,14 @@ func TestWithTimeFormatLayout(t *testing.T) {
 	var models []SheetModel
 	models = append(models, sheet1, sheet1, sheet1, sheet1, sheet1, sheet2, sheet2, sheet2, sheet2, sheet2)
 
-	err := WriteExcelSaveAs("test7.xlsx", models, WithTimeFormatLayout("2006/01/02 15:04:05"))
+	err := WriteExcelSaveAs(dir+"/test7.xlsx", models, WithTimeFormatLayout("2006/01/02 15:04:05"))
 	if err != nil {
 		t.Error(err)
 	}
 }
 
 func TestWithIfNullValue(t *testing.T) {
+	dir := t.TempDir()
 	sheet1 := Sheet1{
 		Col1:  "string",
 		Col2:  1,
@@ -245,13 +248,14 @@ func TestWithIfNullValue(t *testing.T) {
 	var models []SheetModel
 	models = append(models, sheet1, sheet1, sheet1, sheet1, sheet1, sheet2, sheet2, sheet2, sheet2, sheet2)
 
-	err := WriteExcelSaveAs("test8.xlsx", models, WithIfNullValue("-"))
+	err := WriteExcelSaveAs(dir+"/test8.xlsx", models, WithIfNullValue("-"))
 	if err != nil {
 		t.Error(err)
 	}
 }
 
 func TestWithFloatPrecision(t *testing.T) {
+	dir := t.TempDir()
 	sheet1 := Sheet1{
 		Col1:  "string",
 		Col2:  1,
@@ -280,13 +284,14 @@ func TestWithFloatPrecision(t *testing.T) {
 	var models []SheetModel
 	models = append(models, sheet1, sheet1, sheet1, sheet1, sheet1, sheet2, sheet2, sheet2, sheet2, sheet2)
 
-	err := WriteExcelSaveAs("test9.xlsx", models, WithFloatPrecision(10))
+	err := WriteExcelSaveAs(dir+"/test9.xlsx", models, WithFloatPrecision(10))
 	if err != nil {
 		t.Error(err)
 	}
 }
 
 func TestWithFloatFmt(t *testing.T) {
+	dir := t.TempDir()
 	sheet1 := Sheet1{
 		Col1:  "string",
 		Col2:  1,
@@ -315,13 +320,14 @@ func TestWithFloatFmt(t *testing.T) {
 	var models []SheetModel
 	models = append(models, sheet1, sheet1, sheet1, sheet1, sheet1, sheet2, sheet2, sheet2, sheet2, sheet2)
 
-	err := WriteExcelSaveAs("test10.xlsx", models, WithFloatFmt('e'))
+	err := WriteExcelSaveAs(dir+"/test10.xlsx", models, WithFloatFmt('e'))
 	if err != nil {
 		t.Error(err)
 	}
 }
 
 func TestWithBoolValueAs(t *testing.T) {
+	dir := t.TempDir()
 	sheet1 := Sheet1{
 		Col1:  "string",
 		Col2:  1,
@@ -350,25 +356,26 @@ func TestWithBoolValueAs(t *testing.T) {
 	var models []SheetModel
 	models = append(models, sheet1, sheet1, sheet1, sheet1, sheet1, sheet2, sheet2, sheet2, sheet2, sheet2)
 
-	err := WriteExcelSaveAs("test11.xlsx", models, WithBoolValueAs("是", "否"))
+	err := WriteExcelSaveAs(dir+"/test11.xlsx", models, WithBoolValueAs("是", "否"))
 	if err != nil {
 		t.Error(err)
 	}
-	err = WriteExcelSaveAs("test12.xlsx", models, WithBoolValueAs("1", "0"))
+	err = WriteExcelSaveAs(dir+"/test12.xlsx", models, WithBoolValueAs("1", "0"))
 	if err != nil {
 		t.Error(err)
 	}
-	err = WriteExcelSaveAs("test13.xlsx", models, WithBoolValueAs("true", "false"))
+	err = WriteExcelSaveAs(dir+"/test13.xlsx", models, WithBoolValueAs("true", "false"))
 	if err != nil {
 		t.Error(err)
 	}
-	err = WriteExcelSaveAs("test14.xlsx", models) // default
+	err = WriteExcelSaveAs(dir+"/test14.xlsx", models) // default
 	if err != nil {
 		t.Error(err)
 	}
 }
 
 func TestWithHeadless(t *testing.T) {
+	dir := t.TempDir()
 	sheet1 := Sheet1{
 		Col1:  "string",
 		Col2:  1,
@@ -397,16 +404,16 @@ func TestWithHeadless(t *testing.T) {
 	var models []SheetModel
 	models = append(models, sheet1, sheet1, sheet1, sheet1, sheet1, sheet2, sheet2, sheet2, sheet2, sheet2)
 
-	err := WriteExcelSaveAs("test15.xlsx", models, WithHeadless())
+	err := WriteExcelSaveAs(dir+"/test15.xlsx", models, WithHeadless())
 	if err != nil {
 		t.Error(err)
 	}
 }
 
 func TestAppendNilRow(t *testing.T) {
+	dir := t.TempDir()
 	var models []SheetModel
 	models = append(models, nil)
-	err := WriteExcelSaveAs("test16.xlsx", models)
+	err := WriteExcelSaveAs(dir+"/test16.xlsx", models)
 	require.EqualError(t, err, "nil reference row append is not allowed")
-
 }

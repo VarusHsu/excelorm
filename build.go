@@ -89,6 +89,7 @@ func WriteExcelSaveAs(fileName string, sheetModels []SheetModel, opts ...Option)
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 	return f.SaveAs(fileName)
 }
 
@@ -205,15 +206,21 @@ func setNoDataSheetHeaders(f *excelize.File, options *options) error {
 		}
 
 		modelType := reflect.TypeOf(model)
+		colIdx := 0
 		for i := 0; i < modelType.NumField(); i++ {
 			field := modelType.Field(i)
-			header := field.Tag.Get("excel_header")
-			if header == "" { // if no excel_header tag, use field name as header
-				header = field.Name
-			} else if header == "-" {
+			header := field.Tag.Get("excelorm")
+			if header == "" { // Deprecated
+				header = field.Tag.Get("excel_header")
+			}
+			if header == "-" {
 				continue // skip this field if header is "-"
 			}
-			cellName, err := coordinatesToCellName(i+1, 1)
+			if header == "" { // if no excel_header tag, use field name as header
+				header = field.Name
+			}
+			colIdx++
+			cellName, err := coordinatesToCellName(colIdx, 1)
 			if err != nil {
 				return err
 			}
@@ -232,6 +239,7 @@ func WriteExcelAsBytesBuffer(sheetModels []SheetModel, opts ...Option) (*bytes.B
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 	err = f.Write(buffer)
 	if err != nil {
 		return nil, err
@@ -323,6 +331,7 @@ func appendRow(sw *excelize.StreamWriter, sheetModel SheetModel, line int, optio
 	}
 
 	modelType := reflect.TypeOf(sheetModel)
+	modelValue := reflect.ValueOf(sheetModel)
 	line++                              // index start from 0 but excel start from 1
 	if line == 1 && !options.headless { // set header
 		var values []any
@@ -331,6 +340,9 @@ func appendRow(sw *excelize.StreamWriter, sheetModel SheetModel, line int, optio
 			header := field.Tag.Get("excelorm")
 			if header == "" { // Deprecated
 				header = field.Tag.Get("excel_header")
+			}
+			if header == "-" {
+				continue // skip this field if header is "-"
 			}
 			if header == "" { // if no excel_header tag, use field name as header
 				header = field.Name
@@ -353,19 +365,27 @@ func appendRow(sw *excelize.StreamWriter, sheetModel SheetModel, line int, optio
 	var values = make([]any, 0, modelType.NumField())
 	for i := 0; i < modelType.NumField(); i++ {
 		field := modelType.Field(i)
-		fieldValue := reflect.ValueOf(sheetModel).Field(i) // get field value
-		fieldKind := field.Type.Kind()                     // get field kind
-	unAddrTo:
-		switch fieldKind {
-		case reflect.Pointer: // if field is pointer, get its value
-			canAddr := fieldValue.Elem().CanAddr() // check if can get its value
-			if !canAddr {
-				values = append(values, options.ifNullValue)
-			} else {
-				fieldValue = reflect.Indirect(fieldValue) // get value of pointer point to
-				fieldKind = fieldValue.Kind()             // get kind of pointer point to
-				goto unAddrTo                             // jump to unAddrTo, because now field is not pointer
+		header := field.Tag.Get("excelorm")
+		if header == "" {
+			header = field.Tag.Get("excel_header")
+		}
+		if header == "-" {
+			continue // skip this field if header is "-"
+		}
+		fieldValue := modelValue.Field(i) // get field value
+		fieldKind := field.Type.Kind()     // get field kind
+		for fieldKind == reflect.Pointer { // dereference pointer chain
+			if !fieldValue.Elem().CanAddr() {
+				break
 			}
+			fieldValue = reflect.Indirect(fieldValue)
+			fieldKind = fieldValue.Kind()
+		}
+		if fieldKind == reflect.Pointer { // nil pointer
+			values = append(values, options.ifNullValue)
+			continue
+		}
+		switch fieldKind {
 		case reflect.Struct, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
 			reflect.String, reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 			reflect.Float32, reflect.Float64:
@@ -392,12 +412,11 @@ func appendRow(sw *excelize.StreamWriter, sheetModel SheetModel, line int, optio
 					values = append(values, *options.falseValue)
 				} else { // using default
 					values = append(values, value)
-
 				}
 			case float32: // convert float32 to string using options
 				values = append(values, strconv.FormatFloat(float64(value), options.floatFmt, options.floatPrecision, 32))
 			case float64: // convert float64 to string using options
-				values = append(values, strconv.FormatFloat(value, options.floatFmt, options.floatPrecision, 32))
+				values = append(values, strconv.FormatFloat(value, options.floatFmt, options.floatPrecision, 64))
 			case time.Time: // convert time.Time to string using options
 				values = append(values, value.Format(options.timeFormatLayout))
 			default:
