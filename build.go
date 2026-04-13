@@ -89,7 +89,9 @@ func WriteExcelSaveAs(fileName string, sheetModels []SheetModel, opts ...Option)
 	if err != nil {
 		return err
 	}
-	return f.SaveAs(fileName)
+	saveErr := f.SaveAs(fileName)
+	closeErr := f.Close()
+	return errors.Join(saveErr, closeErr)
 }
 
 func write(sheetModels []SheetModel, opts ...Option) (*excelize.File, error) {
@@ -106,6 +108,12 @@ func write(sheetModels []SheetModel, opts ...Option) (*excelize.File, error) {
 	}
 
 	f := excelize.NewFile()
+	cleanup := true
+	defer func() {
+		if cleanup {
+			_ = f.Close()
+		}
+	}()
 	swMap := make(map[string]*excelize.StreamWriter)
 	lineNumMap := make(map[string]int)
 	for _, sheetModel := range sheetModels {
@@ -171,6 +179,7 @@ func write(sheetModels []SheetModel, opts ...Option) (*excelize.File, error) {
 			return nil, err
 		}
 	}
+	cleanup = false
 	return f, nil
 }
 
@@ -233,8 +242,9 @@ func WriteExcelAsBytesBuffer(sheetModels []SheetModel, opts ...Option) (*bytes.B
 	if err != nil {
 		return nil, err
 	}
-	err = f.Write(buffer)
-	if err != nil {
+	writeErr := f.Write(buffer)
+	closeErr := f.Close()
+	if err = errors.Join(writeErr, closeErr); err != nil {
 		return nil, err
 	}
 	return buffer, nil
