@@ -20,11 +20,13 @@
 package excelorm
 
 import (
+	"bytes"
+	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/xuri/excelize/v2"
 )
 
 type Sheet1 struct {
@@ -41,7 +43,7 @@ type Sheet1 struct {
 }
 
 func (Sheet1) SheetName() string {
-	return "sheet1"
+	return "sheet_one"
 }
 
 type Sheet2 struct {
@@ -59,7 +61,7 @@ type Sheet2 struct {
 }
 
 func (Sheet2) SheetName() string {
-	return "sheet2"
+	return "sheet_two"
 }
 
 type Sheet3 struct {
@@ -103,310 +105,406 @@ func (Sheet7) SheetName() string {
 	return "sheet7"
 }
 
-func TestWriteExcel(t *testing.T) {
-	sheet1 := Sheet1{
-		Col1:  "string",
-		Col2:  1,
-		Col3:  1.1,
-		Col4:  true,
-		Col5:  time.Now(),
-		Col6:  nil,
-		Col7:  nil,
-		Col8:  nil,
-		Col9:  nil,
-		Col10: nil,
-	}
-	var a = "string_value"
-	sheet2 := Sheet2{
-		Col1:  "string",
-		Col2:  1,
-		Col3:  1.1,
-		Col4:  true,
-		Col5:  time.Now(),
-		Col6:  &a,
-		Col7:  nil,
-		Col8:  nil,
-		Col9:  nil,
-		Col10: nil,
-	}
-	var models []SheetModel
-	models = append(models, sheet1, sheet1, sheet1, sheet1, sheet1, sheet2, sheet2, sheet2, sheet2, sheet2)
+type SheetHeaderSkip struct {
+	Keep string `excel_header:"keep"`
+	Drop string `excel_header:"-"`
+}
 
-	err := WriteExcelSaveAs("test1.xlsx", models)
-	if err != nil {
-		t.Error(err)
-	}
+func (SheetHeaderSkip) SheetName() string {
+	return "header_skip"
+}
 
-	sheet3 := Sheet3{
-		Col1: "string",
-	}
+type SheetDefault struct {
+	Col1 string `excel_header:"col1"`
+}
 
-	models = append(models, sheet3)
-	err = WriteExcelSaveAs("test2.xlsx", models)
-	require.EqualError(t, err, "sheetModel must have a sheet name")
+func (SheetDefault) SheetName() string {
+	return "Sheet1"
+}
 
-	sheet4 := Sheet4(1)
-	models = make([]SheetModel, 0)
-	models = append(models, sheet4)
-	err = WriteExcelSaveAs("test3.xlsx", models)
-	require.EqualError(t, err, "sheetModel must be struct")
+type SheetUint struct {
+	U uint `excel_header:"u"`
+}
 
-	sheet5 := Sheet5{
-		Col1: "string",
-	}
-	models = make([]SheetModel, 0)
-	models = append(models, sheet5)
-	err = WriteExcelSaveAs("test4.xlsx", models)
+func (SheetUint) SheetName() string {
+	return "sheet_uint"
+}
 
-	sheet6 := Sheet6{
-		Col1: map[string]string{
-			"key": "value",
+type SheetLegacyTag struct {
+	Legacy string `excelorm:"legacy_header"`
+}
+
+func (SheetLegacyTag) SheetName() string {
+	return "sheet_legacy"
+}
+
+type NilHeader struct{}
+
+func (*NilHeader) SheetName() string {
+	return "nil_header"
+}
+
+func baseModels(boolValue bool) []SheetModel {
+	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	str := "string_value"
+	return []SheetModel{
+		Sheet1{
+			Col1:  "string",
+			Col2:  1,
+			Col3:  1.1,
+			Col4:  true,
+			Col5:  now,
+			Col6:  nil,
+			Col7:  nil,
+			Col8:  nil,
+			Col9:  nil,
+			Col10: nil,
+		},
+		Sheet2{
+			Col1:  "string",
+			Col2:  1,
+			Col3:  1.1,
+			Col4:  boolValue,
+			Col5:  now,
+			Col6:  &str,
+			Col7:  nil,
+			Col8:  nil,
+			Col9:  nil,
+			Col10: nil,
 		},
 	}
-	models = make([]SheetModel, 0)
-	models = append(models, sheet6)
+}
+
+func TestWriteExcelSaveAs_Success(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "success.xlsx")
+	require.NoError(t, WriteExcelSaveAs(output, baseModels(false)))
+}
+
+func TestWriteExcelSaveAs_Errors(t *testing.T) {
+	testCases := []struct {
+		name    string
+		file    string
+		models  []SheetModel
+		errText string
+	}{
+		{
+			name:    "empty file name",
+			file:    "",
+			models:  baseModels(false),
+			errText: "fileName can not be empty",
+		},
+		{
+			name:    "empty sheet name",
+			file:    "invalid.xlsx",
+			models:  []SheetModel{Sheet3{Col1: "string"}},
+			errText: "sheetModel must have a sheet name",
+		},
+		{
+			name:    "non struct sheet model",
+			file:    "invalid.xlsx",
+			models:  []SheetModel{Sheet4(1)},
+			errText: "sheetModel must be struct",
+		},
+		{
+			name: "unsupported map type",
+			file: "invalid.xlsx",
+			models: []SheetModel{
+				Sheet6{Col1: map[string]string{"key": "value"}},
+			},
+			errText: "unsupported type map",
+		},
+		{
+			name: "unsupported nested struct",
+			file: "invalid.xlsx",
+			models: []SheetModel{
+				Sheet7{SubStruct: subStruct{Field: "field"}},
+			},
+			errText: "unsupported type excelorm.subStruct",
+		},
+		{
+			name:    "nil row",
+			file:    "invalid.xlsx",
+			models:  []SheetModel{nil},
+			errText: "nil reference row append is not allowed",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fileName := tc.file
+			if fileName != "" {
+				fileName = filepath.Join(t.TempDir(), fileName)
+			}
+			err := WriteExcelSaveAs(fileName, tc.models)
+			require.EqualError(t, err, tc.errText)
+		})
+	}
+}
+
+func TestWriteExcelSaveAs_Options(t *testing.T) {
+	testCases := []struct {
+		name string
+		opts []Option
+	}{
+		{name: "time format", opts: []Option{WithTimeFormatLayout("2006/01/02 15:04:05")}},
+		{name: "null value", opts: []Option{WithIfNullValue("-")}},
+		{name: "float precision", opts: []Option{WithFloatPrecision(10)}},
+		{name: "float format", opts: []Option{WithFloatFmt('e')}},
+		{name: "bool as words", opts: []Option{WithBoolValueAs("yes", "no")}},
+		{name: "bool as digits", opts: []Option{WithBoolValueAs("1", "0")}},
+		{name: "bool as literals", opts: []Option{WithBoolValueAs("true", "false")}},
+		{name: "headless", opts: []Option{WithHeadless()}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			output := filepath.Join(t.TempDir(), tc.name+".xlsx")
+			require.NoError(t, WriteExcelSaveAs(output, baseModels(false), tc.opts...))
+		})
+	}
+}
+
+func TestWriteExcelAsBytesBuffer(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		buffer, err := WriteExcelAsBytesBuffer(baseModels(false), WithIfNullValue("-"))
+		require.NoError(t, err)
+		require.NotNil(t, buffer)
+		require.NotZero(t, buffer.Len())
+	})
+
+	t.Run("nil row", func(t *testing.T) {
+		_, err := WriteExcelAsBytesBuffer([]SheetModel{nil})
+		require.EqualError(t, err, "nil reference row append is not allowed")
+	})
+}
+
+func TestWithSheetHeaders_NoData(t *testing.T) {
+	buffer, err := WriteExcelAsBytesBuffer(nil, WithSheetHeaders(Sheet1{}))
 	require.NoError(t, err)
 
-	err = WriteExcelSaveAs("test5.xlsx", models)
-	require.EqualError(t, err, "unsupported type map")
+	file, err := excelize.OpenReader(bytes.NewReader(buffer.Bytes()))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, file.Close())
+	})
 
-	sheet7 := Sheet7{
-		SubStruct: subStruct{
-			Field: "field",
-		},
-	}
-	models = make([]SheetModel, 0)
-	models = append(models, sheet7)
-	err = WriteExcelSaveAs("test6.xlsx", models)
-	assert.EqualError(t, err, "unsupported type excelorm.subStruct")
+	value, err := file.GetCellValue("sheet_one", "A1")
+	require.NoError(t, err)
+	require.Equal(t, "string", value)
 }
 
-func TestWithTimeFormatLayout(t *testing.T) {
-	sheet1 := Sheet1{
-		Col1:  "string",
-		Col2:  1,
-		Col3:  1.1,
-		Col4:  true,
-		Col5:  time.Now(),
-		Col6:  nil,
-		Col7:  nil,
-		Col8:  nil,
-		Col9:  nil,
-		Col10: nil,
-	}
-	var a = "string_value"
-	sheet2 := Sheet2{
-		Col1:  "string",
-		Col2:  1,
-		Col3:  1.1,
-		Col4:  true,
-		Col5:  time.Now(),
-		Col6:  &a,
-		Col7:  nil,
-		Col8:  nil,
-		Col9:  nil,
-		Col10: nil,
-	}
-	var models []SheetModel
-	models = append(models, sheet1, sheet1, sheet1, sheet1, sheet1, sheet2, sheet2, sheet2, sheet2, sheet2)
+func TestWithHeadless_DoesNotWriteHeader(t *testing.T) {
+	buffer, err := WriteExcelAsBytesBuffer(baseModels(true), WithHeadless())
+	require.NoError(t, err)
 
-	err := WriteExcelSaveAs("test7.xlsx", models, WithTimeFormatLayout("2006/01/02 15:04:05"))
-	if err != nil {
-		t.Error(err)
-	}
+	file, err := excelize.OpenReader(bytes.NewReader(buffer.Bytes()))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, file.Close())
+	})
+
+	firstCell, err := file.GetCellValue("sheet_one", "A1")
+	require.NoError(t, err)
+	require.Equal(t, "string", firstCell)
 }
 
-func TestWithIfNullValue(t *testing.T) {
-	sheet1 := Sheet1{
-		Col1:  "string",
-		Col2:  1,
-		Col3:  1.1,
-		Col4:  true,
-		Col5:  time.Now(),
-		Col6:  nil,
-		Col7:  nil,
-		Col8:  nil,
-		Col9:  nil,
-		Col10: nil,
-	}
-	var a = "string_value"
-	sheet2 := Sheet2{
-		Col1:  "string",
-		Col2:  1,
-		Col3:  1.1,
-		Col4:  true,
-		Col5:  time.Now(),
-		Col6:  &a,
-		Col7:  nil,
-		Col8:  nil,
-		Col9:  nil,
-		Col10: nil,
-	}
-	var models []SheetModel
-	models = append(models, sheet1, sheet1, sheet1, sheet1, sheet1, sheet2, sheet2, sheet2, sheet2, sheet2)
+func TestWithIntegerAsString_WritesStringCell(t *testing.T) {
+	defaultBuffer, err := WriteExcelAsBytesBuffer(baseModels(false))
+	require.NoError(t, err)
 
-	err := WriteExcelSaveAs("test8.xlsx", models, WithIfNullValue("-"))
-	if err != nil {
-		t.Error(err)
-	}
+	defaultFile, err := excelize.OpenReader(bytes.NewReader(defaultBuffer.Bytes()))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, defaultFile.Close())
+	})
+
+	defaultType, err := defaultFile.GetCellType("sheet_one", "B2")
+	require.NoError(t, err)
+	require.Equal(t, excelize.CellTypeUnset, defaultType)
+
+	stringBuffer, err := WriteExcelAsBytesBuffer(baseModels(false), WithIntegerAsString())
+	require.NoError(t, err)
+
+	stringFile, err := excelize.OpenReader(bytes.NewReader(stringBuffer.Bytes()))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, stringFile.Close())
+	})
+
+	stringType, err := stringFile.GetCellType("sheet_one", "B2")
+	require.NoError(t, err)
+	require.Contains(t, []excelize.CellType{excelize.CellTypeInlineString, excelize.CellTypeSharedString}, stringType)
 }
 
-func TestWithFloatPrecision(t *testing.T) {
-	sheet1 := Sheet1{
-		Col1:  "string",
-		Col2:  1,
-		Col3:  1.1,
-		Col4:  true,
-		Col5:  time.Now(),
-		Col6:  nil,
-		Col7:  nil,
-		Col8:  nil,
-		Col9:  nil,
-		Col10: nil,
-	}
-	var a = "string_value"
-	sheet2 := Sheet2{
-		Col1:  "string",
-		Col2:  1,
-		Col3:  1.1,
-		Col4:  true,
-		Col5:  time.Now(),
-		Col6:  &a,
-		Col7:  nil,
-		Col8:  nil,
-		Col9:  nil,
-		Col10: nil,
-	}
-	var models []SheetModel
-	models = append(models, sheet1, sheet1, sheet1, sheet1, sheet1, sheet2, sheet2, sheet2, sheet2, sheet2)
+func TestWithSheetHeaders_PointerAndSkipTags(t *testing.T) {
+	buffer, err := WriteExcelAsBytesBuffer(nil, WithSheetHeaders(&SheetHeaderSkip{}))
+	require.NoError(t, err)
 
-	err := WriteExcelSaveAs("test9.xlsx", models, WithFloatPrecision(10))
-	if err != nil {
-		t.Error(err)
-	}
+	file, err := excelize.OpenReader(bytes.NewReader(buffer.Bytes()))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, file.Close())
+	})
+
+	keep, err := file.GetCellValue("header_skip", "A1")
+	require.NoError(t, err)
+	require.Equal(t, "keep", keep)
+
+	drop, err := file.GetCellValue("header_skip", "B1")
+	require.NoError(t, err)
+	require.Empty(t, drop)
 }
 
-func TestWithFloatFmt(t *testing.T) {
-	sheet1 := Sheet1{
-		Col1:  "string",
-		Col2:  1,
-		Col3:  1.1,
-		Col4:  true,
-		Col5:  time.Now(),
-		Col6:  nil,
-		Col7:  nil,
-		Col8:  nil,
-		Col9:  nil,
-		Col10: nil,
-	}
-	var a = "string_value"
-	sheet2 := Sheet2{
-		Col1:  "string",
-		Col2:  1,
-		Col3:  1.1,
-		Col4:  true,
-		Col5:  time.Now(),
-		Col6:  &a,
-		Col7:  nil,
-		Col8:  nil,
-		Col9:  nil,
-		Col10: nil,
-	}
-	var models []SheetModel
-	models = append(models, sheet1, sheet1, sheet1, sheet1, sheet1, sheet2, sheet2, sheet2, sheet2, sheet2)
+func TestWithSheetHeaders_ExistingSheetKeepsHeader(t *testing.T) {
+	buffer, err := WriteExcelAsBytesBuffer(baseModels(false), WithSheetHeaders(Sheet1{}))
+	require.NoError(t, err)
 
-	err := WriteExcelSaveAs("test10.xlsx", models, WithFloatFmt('e'))
-	if err != nil {
-		t.Error(err)
+	file, err := excelize.OpenReader(bytes.NewReader(buffer.Bytes()))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, file.Close())
+	})
+
+	header, err := file.GetCellValue("sheet_one", "A1")
+	require.NoError(t, err)
+	require.Equal(t, "string", header)
+}
+
+func TestWriteExcel_KeepSheet1WhenRequested(t *testing.T) {
+	buffer, err := WriteExcelAsBytesBuffer([]SheetModel{SheetDefault{Col1: "v"}})
+	require.NoError(t, err)
+
+	file, err := excelize.OpenReader(bytes.NewReader(buffer.Bytes()))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, file.Close())
+	})
+
+	value, err := file.GetCellValue("Sheet1", "A1")
+	require.NoError(t, err)
+	require.Equal(t, "col1", value)
+}
+
+func TestCoordinatesToCellName(t *testing.T) {
+	testCases := []struct {
+		name    string
+		col     int
+		row     int
+		cell    string
+		errText string
+	}{
+		{name: "valid", col: 1, row: 1, cell: "A1"},
+		{name: "invalid col", col: 0, row: 1, errText: "invalid cell reference [0, 1]"},
+		{name: "invalid row", col: 1, row: 0, errText: "invalid cell reference [1, 0]"},
+		{name: "row overflow", col: 1, row: 1048577, errText: "row number exceeds maximum limit"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cell, err := coordinatesToCellName(tc.col, tc.row)
+			if tc.errText != "" {
+				require.EqualError(t, err, tc.errText)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.cell, cell)
+		})
 	}
 }
 
-func TestWithBoolValueAs(t *testing.T) {
-	sheet1 := Sheet1{
-		Col1:  "string",
-		Col2:  1,
-		Col3:  1.1,
-		Col4:  true,
-		Col5:  time.Now(),
-		Col6:  nil,
-		Col7:  nil,
-		Col8:  nil,
-		Col9:  nil,
-		Col10: nil,
+func TestColumnNumberToName(t *testing.T) {
+	testCases := []struct {
+		name    string
+		num     int
+		nameOut string
+		errText string
+	}{
+		{name: "valid A", num: 1, nameOut: "A"},
+		{name: "valid AA", num: 27, nameOut: "AA"},
+		{name: "too small", num: 0, errText: "the column number must be greater than or equal to 1 and less than or equal to 16384"},
+		{name: "too large", num: 16385, errText: "the column number must be greater than or equal to 1 and less than or equal to 16384"},
 	}
-	var a = "string_value"
-	sheet2 := Sheet2{
-		Col1:  "string",
-		Col2:  1,
-		Col3:  1.1,
-		Col4:  false,
-		Col5:  time.Now(),
-		Col6:  &a,
-		Col7:  nil,
-		Col8:  nil,
-		Col9:  nil,
-		Col10: nil,
-	}
-	var models []SheetModel
-	models = append(models, sheet1, sheet1, sheet1, sheet1, sheet1, sheet2, sheet2, sheet2, sheet2, sheet2)
 
-	err := WriteExcelSaveAs("test11.xlsx", models, WithBoolValueAs("是", "否"))
-	if err != nil {
-		t.Error(err)
-	}
-	err = WriteExcelSaveAs("test12.xlsx", models, WithBoolValueAs("1", "0"))
-	if err != nil {
-		t.Error(err)
-	}
-	err = WriteExcelSaveAs("test13.xlsx", models, WithBoolValueAs("true", "false"))
-	if err != nil {
-		t.Error(err)
-	}
-	err = WriteExcelSaveAs("test14.xlsx", models) // default
-	if err != nil {
-		t.Error(err)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			nameOut, err := columnNumberToName(tc.num)
+			if tc.errText != "" {
+				require.EqualError(t, err, tc.errText)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.nameOut, nameOut)
+		})
 	}
 }
 
-func TestWithHeadless(t *testing.T) {
-	sheet1 := Sheet1{
-		Col1:  "string",
-		Col2:  1,
-		Col3:  1.1,
-		Col4:  true,
-		Col5:  time.Now(),
-		Col6:  nil,
-		Col7:  nil,
-		Col8:  nil,
-		Col9:  nil,
-		Col10: nil,
-	}
-	var a = "string_value"
-	sheet2 := Sheet2{
-		Col1:  "string",
-		Col2:  1,
-		Col3:  1.1,
-		Col4:  false,
-		Col5:  time.Now(),
-		Col6:  &a,
-		Col7:  nil,
-		Col8:  nil,
-		Col9:  nil,
-		Col10: nil,
-	}
-	var models []SheetModel
-	models = append(models, sheet1, sheet1, sheet1, sheet1, sheet1, sheet2, sheet2, sheet2, sheet2, sheet2)
+func TestWithIntegerAsString_Uint(t *testing.T) {
+	buffer, err := WriteExcelAsBytesBuffer([]SheetModel{SheetUint{U: 9}}, WithIntegerAsString())
+	require.NoError(t, err)
 
-	err := WriteExcelSaveAs("test15.xlsx", models, WithHeadless())
-	if err != nil {
-		t.Error(err)
-	}
+	file, err := excelize.OpenReader(bytes.NewReader(buffer.Bytes()))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, file.Close())
+	})
+
+	cellType, err := file.GetCellType("sheet_uint", "A2")
+	require.NoError(t, err)
+	require.Contains(t, []excelize.CellType{excelize.CellTypeInlineString, excelize.CellTypeSharedString}, cellType)
 }
 
-func TestAppendNilRow(t *testing.T) {
-	var models []SheetModel
-	models = append(models, nil)
-	err := WriteExcelSaveAs("test16.xlsx", models)
+func TestDeprecatedExcelORMTagHeader(t *testing.T) {
+	buffer, err := WriteExcelAsBytesBuffer([]SheetModel{SheetLegacyTag{Legacy: "v"}})
+	require.NoError(t, err)
+
+	file, err := excelize.OpenReader(bytes.NewReader(buffer.Bytes()))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, file.Close())
+	})
+
+	header, err := file.GetCellValue("sheet_legacy", "A1")
+	require.NoError(t, err)
+	require.Equal(t, "legacy_header", header)
+}
+
+func TestAppendRow_PointerModel(t *testing.T) {
+	f := excelize.NewFile()
+	t.Cleanup(func() {
+		require.NoError(t, f.Close())
+	})
+	_, err := f.NewSheet("pointer_sheet")
+	require.NoError(t, err)
+
+	sw, err := f.NewStreamWriter("pointer_sheet")
+	require.NoError(t, err)
+
+	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	model := &Sheet1{Col1: "string", Col2: 1, Col3: 1.1, Col4: true, Col5: now}
+
+	err = appendRow(sw, model, 0, &options{timeFormatLayout: "2006-01-02 15:04:05", floatPrecision: 2, floatFmt: 'f'})
+	require.NoError(t, err)
+	require.NoError(t, sw.Flush())
+}
+
+func TestAppendRow_NilPointerModel(t *testing.T) {
+	f := excelize.NewFile()
+	t.Cleanup(func() {
+		require.NoError(t, f.Close())
+	})
+	_, err := f.NewSheet("pointer_sheet")
+	require.NoError(t, err)
+
+	sw, err := f.NewStreamWriter("pointer_sheet")
+	require.NoError(t, err)
+
+	var model *Sheet1
+	err = appendRow(sw, model, 0, &options{timeFormatLayout: "2006-01-02 15:04:05", floatPrecision: 2, floatFmt: 'f'})
 	require.EqualError(t, err, "nil reference row append is not allowed")
+}
 
+func TestWithSheetHeaders_NilPointer(t *testing.T) {
+	var header *NilHeader
+	_, err := WriteExcelAsBytesBuffer(nil, WithSheetHeaders(header))
+	require.EqualError(t, err, "nil reference row append is not allowed")
 }
