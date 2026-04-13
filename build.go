@@ -32,7 +32,7 @@ import (
 
 type Option func(*options)
 
-// WriteExcelSaveAs 生成excel文件并保存到本地
+// WriteExcelSaveAs creates an Excel file and saves it to local storage.
 // example usage:
 //
 //	//define a struct
@@ -225,7 +225,8 @@ func setNoDataSheetHeaders(f *excelize.File, options *options) error {
 	return nil
 }
 
-// WriteExcelAsBytesBuffer 生成excel并保存为 bytes.Buffer, 用法同 WriteExcelSaveAs
+// WriteExcelAsBytesBuffer creates an Excel file and writes it to a bytes.Buffer.
+// Usage is the same as WriteExcelSaveAs.
 func WriteExcelAsBytesBuffer(sheetModels []SheetModel, opts ...Option) (*bytes.Buffer, error) {
 	buffer := new(bytes.Buffer)
 	f, err := write(sheetModels, opts...)
@@ -244,18 +245,18 @@ type SheetModel interface {
 }
 
 type options struct {
-	timeFormatLayout string       // time.Time, *time.Time 的格式化版图
-	floatPrecision   int          // 小数保留多少位
-	floatFmt         byte         // 小数的格式，默认为'f',详细见 strconv.FormatFloat 的注释
-	ifNullValue      string       // null pointer		空值的默认显示
-	sheetHeaders     []SheetModel // 当没有数据时，表头的默认显示
-	trueValue        *string      // bool类型的true显示值
-	falseValue       *string      // bool类型的false显示值
-	integerAsString  bool         // int类型的字段是否以字符串形式显示(避免excel自动转为科学计数法)
-	headless         bool         // 是否显示表头
+	timeFormatLayout string       // Formatting layout for time.Time and *time.Time.
+	floatPrecision   int          // Number of decimal places to keep.
+	floatFmt         byte         // Float format, defaults to 'f'. See strconv.FormatFloat for details.
+	ifNullValue      string       // Default display value for nil pointers.
+	sheetHeaders     []SheetModel // Default headers to show when there is no data.
+	trueValue        *string      // Display value for bool true.
+	falseValue       *string      // Display value for bool false.
+	integerAsString  bool         // Display integer fields as strings (avoid Excel scientific notation).
+	headless         bool         // Whether to hide the header row.
 }
 
-// WithTimeFormatLayout 时间类型的格式化版图
+// WithTimeFormatLayout sets the formatting layout used for time values.
 func WithTimeFormatLayout(layout string) Option {
 	return func(options *options) {
 		options.timeFormatLayout = layout
@@ -274,21 +275,21 @@ func WithFloatFmt(fmt byte) Option {
 	}
 }
 
-// WithIfNullValue 当数据为nil时展示内容
+// WithIfNullValue sets the display value when data is nil.
 func WithIfNullValue(value string) Option {
 	return func(options *options) {
 		options.ifNullValue = value
 	}
 }
 
-// WithSheetHeaders 当没有数据时，默认也要展示表头
+// WithSheetHeaders sets default headers to display even when there is no data.
 func WithSheetHeaders(headers ...SheetModel) Option {
 	return func(options *options) {
 		options.sheetHeaders = headers
 	}
 }
 
-// WithBoolValueAs 当字段类型为bool时，true和false的展示内容
+// WithBoolValueAs sets display values for boolean true and false fields.
 func WithBoolValueAs(trueValue, falseValue string) Option {
 	return func(options *options) {
 		options.trueValue = &trueValue
@@ -296,14 +297,14 @@ func WithBoolValueAs(trueValue, falseValue string) Option {
 	}
 }
 
-// WithIntegerAsString int类型的字段是否以字符串形式显示(避免excel自动转为科学计数法)
+// WithIntegerAsString displays integer fields as strings (to avoid Excel scientific notation).
 func WithIntegerAsString() Option {
 	return func(options *options) {
 		options.integerAsString = true
 	}
 }
 
-// WithHeadless 不显示表头
+// WithHeadless disables writing the header row.
 func WithHeadless() Option {
 	return func(options *options) {
 		options.headless = true
