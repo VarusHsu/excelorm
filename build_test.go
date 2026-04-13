@@ -165,7 +165,7 @@ func TestWriteExcel(t *testing.T) {
 	}
 	models = make([]SheetModel, 0)
 	models = append(models, sheet6)
-	require.NoErrorf(t, err, "")
+	require.NoError(t, err)
 
 	err = WriteExcelSaveAs("test5.xlsx", models)
 	require.EqualError(t, err, "unsupported type map")
