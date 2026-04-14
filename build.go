@@ -33,20 +33,20 @@ import (
 type Option func(*options)
 
 // WriteExcelSaveAs creates an Excel file and saves it to local storage.
-// example usage:
+// Example usage:
 //
-//	//define a struct
+//	// Define a struct.
 //	type Foo struct {
 //		ID        int64      `excel_header:"id"`
 //		Name      string     `excel_header:"name"`
 //		CreatedAt time.Time  `excel_header:"created_at"`
 //		DeletedAt *time.Time `excel_header:"deleted_at"`
 //	}
-//	// implement SheetModel interface
+//	// Implement the SheetModel interface.
 //	func (u Foo) SheetName() string {
 //		return "foo sheet name"
 //	}
-//	//append data to excel file
+//	// Append data to the Excel file.
 //	bar1DeletedAt := time.Date(2024, 1, 3, 15, 4, 5, 0, time.Local)
 //	sheetModels := []excelorm.SheetModel{
 //		Foo{
@@ -61,26 +61,26 @@ type Option func(*options)
 //			CreatedAt: time.Date(2024, 1, 2, 15, 4, 5, 0, time.Local),
 //		},
 //	}
-//	//build Excel file
+//	// Build and save the Excel file.
 //	if err := excelorm.WriteExcelSaveAs("foo.xlsx", sheetModels,
 //		excelorm.WithTimeFormatLayout("2006/01/02 15:04:05"),
 //		excelorm.WithIfNullValue("-"),
 //	); err != nil {
 //		 log.Fatal(err)
 //	}
-//	// After that code execute, you will get `foo.xlsx` file with named `foo sheet name`,
-//	// It's content like next:
+//	// After this code runs, you will get a `foo.xlsx` file with a sheet named `foo sheet name`.
+//	// Its content looks like this:
 //	+-------------------------------------------------------+
 //	| id | name |          created_at |          deleted_at |
 //	+-------------------------------------------------------+
 //	|  1 | Bar1 | 2024/01/02 15:04:05 | 2024/01/03 15:04:05 |
 //	|  2 | Bar2 | 2024/01/02 15:04:05 |                   - |
 //	+-------------------------------------------------------+
-//	// Multi-sheets
-//	// define more structs which implement SheetModel interface
-//	// then construct any of their objects to append to sheetModels
-//	// different sheetModel better have different sheet name to avoid confusion
-//	// rows ordered in Excel file is the same as sheetModels
+//	// Multiple sheets:
+//	// Define more structs that implement the SheetModel interface,
+//	// then append their objects to sheetModels.
+//	// Different sheet models should use different sheet names to avoid confusion.
+//	// Row order in the Excel file matches the order in sheetModels.
 func WriteExcelSaveAs(fileName string, sheetModels []SheetModel, opts ...Option) error {
 	if fileName == "" {
 		return errors.New("fileName can not be empty")
@@ -95,14 +95,14 @@ func WriteExcelSaveAs(fileName string, sheetModels []SheetModel, opts ...Option)
 }
 
 func write(sheetModels []SheetModel, opts ...Option) (*excelize.File, error) {
-	// default options
+	// Default options.
 	options := &options{
 		timeFormatLayout: "2006-01-02 15:04:05",
 		floatPrecision:   2,
 		floatFmt:         'f',
 	}
 
-	// apply options
+	// Apply options.
 	for _, opt := range opts {
 		opt(options)
 	}
@@ -159,7 +159,7 @@ func write(sheetModels []SheetModel, opts ...Option) (*excelize.File, error) {
 		}
 	}
 
-	// delete default sheet
+	// Delete the default sheet.
 	var containsModelSheetNameEqSheet1 bool
 	for _, sheetModel := range sheetModels {
 		if sheetModel.SheetName() == "Sheet1" {
@@ -202,11 +202,11 @@ func setNoDataSheetHeaders(f *excelize.File, options *options) error {
 			return err
 		}
 
-		// check if sheetModel is pointer
+		// Check whether model is a pointer.
 		if reflect.TypeOf(model).Kind() == reflect.Ptr {
-			if reflect.ValueOf(model).Elem().CanAddr() { // check if sheetModel is nil
-				// replace to sheetModel's reference value
-				// if type(model) is SheetModel, then *model is still SheetModel
+			if reflect.ValueOf(model).Elem().CanAddr() { // Check whether model is nil.
+				// Dereference the pointer value.
+				// If type(model) is SheetModel, then *model is still SheetModel.
 				model = reflect.Indirect(reflect.ValueOf(model)).Interface().(SheetModel)
 			} else {
 				return errors.New("nil reference row append is not allowed")
@@ -217,16 +217,16 @@ func setNoDataSheetHeaders(f *excelize.File, options *options) error {
 		for i := 0; i < modelType.NumField(); i++ {
 			field := modelType.Field(i)
 			header := field.Tag.Get("excel_header")
-			if header == "" { // if no excel_header tag, use field name as header
+			if header == "" { // If no excel_header tag is set, use the field name.
 				header = field.Name
 			} else if header == "-" {
-				continue // skip this field if header is "-"
+				continue // Skip this field when header is "-".
 			}
 			cellName, err := coordinatesToCellName(i+1, 1)
 			if err != nil {
 				return err
 			}
-			if err = f.SetCellValue(sheetName, cellName, header); err != nil { // set header
+			if err = f.SetCellValue(sheetName, cellName, header); err != nil { // Set header.
 				return err
 			}
 		}
@@ -322,11 +322,11 @@ func WithHeadless() Option {
 }
 
 func appendRow(sw *excelize.StreamWriter, sheetModel SheetModel, line int, options *options) error {
-	// check if sheetModel is pointer
+	// Check whether sheetModel is a pointer.
 	if reflect.TypeOf(sheetModel).Kind() == reflect.Ptr {
-		if reflect.ValueOf(sheetModel).Elem().CanAddr() { // check if sheetModel is nil
-			// replace to sheetModel's reference value
-			// if type(sheetModel) is SheetModel, then *sheetModel is still SheetModel
+		if reflect.ValueOf(sheetModel).Elem().CanAddr() { // Check whether sheetModel is nil.
+			// Dereference the pointer value.
+			// If type(sheetModel) is SheetModel, then *sheetModel is still SheetModel.
 			sheetModel = reflect.Indirect(reflect.ValueOf(sheetModel)).Interface().(SheetModel)
 		} else {
 			return errors.New("nil reference row append is not allowed")
@@ -334,8 +334,8 @@ func appendRow(sw *excelize.StreamWriter, sheetModel SheetModel, line int, optio
 	}
 
 	modelType := reflect.TypeOf(sheetModel)
-	line++                              // index start from 0 but excel start from 1
-	if line == 1 && !options.headless { // set header
+	line++                              // Index starts from 0, but Excel starts from 1.
+	if line == 1 && !options.headless { // Set header.
 		var values []any
 		for i := 0; i < modelType.NumField(); i++ {
 			field := modelType.Field(i)
@@ -343,7 +343,7 @@ func appendRow(sw *excelize.StreamWriter, sheetModel SheetModel, line int, optio
 			if header == "" { // Deprecated
 				header = field.Tag.Get("excel_header")
 			}
-			if header == "" { // if no excel_header tag, use field name as header
+			if header == "" { // If no excel_header tag is set, use the field name.
 				header = field.Name
 			}
 			values = append(values, header)
@@ -352,7 +352,7 @@ func appendRow(sw *excelize.StreamWriter, sheetModel SheetModel, line int, optio
 		if err != nil {
 			return err
 		}
-		if err = sw.SetRow(cellName, values); err != nil { // set header
+		if err = sw.SetRow(cellName, values); err != nil { // Set header.
 			return err
 		}
 	}
@@ -368,48 +368,48 @@ func appendRow(sw *excelize.StreamWriter, sheetModel SheetModel, line int, optio
 		fieldKind := field.Type.Kind()                     // get field kind
 	unAddrTo:
 		switch fieldKind {
-		case reflect.Pointer: // if field is pointer, get its value
-			canAddr := fieldValue.Elem().CanAddr() // check if can get its value
+		case reflect.Pointer: // If the field is a pointer, resolve its value.
+			canAddr := fieldValue.Elem().CanAddr() // Check whether the pointed value is accessible.
 			if !canAddr {
 				values = append(values, options.ifNullValue)
 			} else {
-				fieldValue = reflect.Indirect(fieldValue) // get value of pointer point to
-				fieldKind = fieldValue.Kind()             // get kind of pointer point to
-				goto unAddrTo                             // jump to unAddrTo, because now field is not pointer
+				fieldValue = reflect.Indirect(fieldValue) // Get the pointed value.
+				fieldKind = fieldValue.Kind()             // Get the pointed value kind.
+				goto unAddrTo                             // Re-check now that the field is no longer a pointer.
 			}
 		case reflect.Struct, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
 			reflect.String, reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 			reflect.Float32, reflect.Float64:
-			valueInterface := fieldValue.Interface() // get field value (type interface{})
-			switch value := valueInterface.(type) {  // type assertion
+			valueInterface := fieldValue.Interface() // Get the field value (type interface{}).
+			switch value := valueInterface.(type) {  // Type assertion.
 			case int, int8, int16, int32, int64:
 				if options.integerAsString {
-					values = append(values, strconv.FormatInt(fieldValue.Int(), 10)) // set int cell value
+					values = append(values, strconv.FormatInt(fieldValue.Int(), 10)) // Set integer cell value.
 				} else {
-					values = append(values, value) // set string (converted) cell value
+					values = append(values, value)
 				}
 			case uint, uint8, uint16, uint32, uint64:
 				if options.integerAsString {
-					values = append(values, strconv.FormatUint(fieldValue.Uint(), 10)) // set uint cell value
+					values = append(values, strconv.FormatUint(fieldValue.Uint(), 10)) // Set unsigned integer cell value.
 				} else {
-					values = append(values, value) // set string (converted) cell value
+					values = append(values, value)
 				}
 			case string:
-				values = append(values, value) // set string cell value
-			case bool: // convert bool to string using options
-				if options.trueValue != nil && value { // if trueValue is set and value is true
+				values = append(values, value) // Set string cell value.
+			case bool: // Convert bool using options.
+				if options.trueValue != nil && value { // trueValue is set and value is true.
 					values = append(values, *options.trueValue)
-				} else if options.falseValue != nil && !value { // if falseValue is set and value is false
+				} else if options.falseValue != nil && !value { // falseValue is set and value is false.
 					values = append(values, *options.falseValue)
-				} else { // using default
+				} else { // Use default bool output.
 					values = append(values, value)
 
 				}
-			case float32: // convert float32 to string using options
+			case float32: // Format float32 using options.
 				values = append(values, strconv.FormatFloat(float64(value), options.floatFmt, options.floatPrecision, 32))
-			case float64: // convert float64 to string using options
+			case float64: // Format float64 using options.
 				values = append(values, strconv.FormatFloat(value, options.floatFmt, options.floatPrecision, 32))
-			case time.Time: // convert time.Time to string using options
+			case time.Time: // Format time.Time using options.
 				values = append(values, value.Format(options.timeFormatLayout))
 			default:
 				return fmt.Errorf("unsupported type %T", value)
@@ -430,11 +430,11 @@ func appendRow(sw *excelize.StreamWriter, sheetModel SheetModel, line int, optio
 	return nil
 }
 
-// next code is copied and modified from https://github.com/360EntSecGroup-Skylar/excelize
+// The following code is copied and modified from https://github.com/360EntSecGroup-Skylar/excelize.
 
 // coordinatesToCellName converts [X, Y] coordinates to alpha-numeric cell
-// name or returns an error.
-// egs:
+// name, or returns an error.
+// Example:
 //
 //	excelize.coordinatesToCellName(1, 1) // returns "A1", nil
 func coordinatesToCellName(col, row int) (string, error) {
