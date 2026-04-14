@@ -144,6 +144,14 @@ func (*NilHeader) SheetName() string {
 	return "nil_header"
 }
 
+type PointerReceiverSheet struct {
+	Col1 string `excel_header:"col1"`
+}
+
+func (*PointerReceiverSheet) SheetName() string {
+	return "pointer_receiver_sheet"
+}
+
 func baseModels(boolValue bool) []SheetModel {
 	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	str := "string_value"
@@ -178,6 +186,29 @@ func baseModels(boolValue bool) []SheetModel {
 func TestWriteExcelSaveAs_Success(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "success.xlsx")
 	require.NoError(t, WriteExcelSaveAs(output, baseModels(false)))
+
+	t.Run("pointer struct", func(t *testing.T) {
+		output := filepath.Join(t.TempDir(), "pointer_success.xlsx")
+		now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+		models := []SheetModel{
+			&Sheet1{Col1: "string", Col2: 1, Col3: 1.1, Col4: true, Col5: now},
+		}
+		require.NoError(t, WriteExcelSaveAs(output, models))
+
+		file, err := excelize.OpenFile(output)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			require.NoError(t, file.Close())
+		})
+
+		header, err := file.GetCellValue("sheet_one", "A1")
+		require.NoError(t, err)
+		require.Equal(t, "string", header)
+
+		value, err := file.GetCellValue("sheet_one", "A2")
+		require.NoError(t, err)
+		require.Equal(t, "string", value)
+	})
 }
 
 func TestWriteExcelSaveAs_Errors(t *testing.T) {
@@ -227,6 +258,15 @@ func TestWriteExcelSaveAs_Errors(t *testing.T) {
 			models:  []SheetModel{nil},
 			errText: "nil reference row append is not allowed",
 		},
+		{
+			name: "nil typed pointer row",
+			file: "invalid.xlsx",
+			models: func() []SheetModel {
+				var model *Sheet1
+				return []SheetModel{model}
+			}(),
+			errText: "nil reference row append is not allowed",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -272,8 +312,59 @@ func TestWriteExcelAsBytesBuffer(t *testing.T) {
 		require.NotZero(t, buffer.Len())
 	})
 
+	t.Run("pointer struct", func(t *testing.T) {
+		now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+		buffer, err := WriteExcelAsBytesBuffer([]SheetModel{
+			&Sheet1{Col1: "string", Col2: 1, Col3: 1.1, Col4: true, Col5: now},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, buffer)
+		require.NotZero(t, buffer.Len())
+
+		file, err := excelize.OpenReader(bytes.NewReader(buffer.Bytes()))
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			require.NoError(t, file.Close())
+		})
+
+		header, err := file.GetCellValue("sheet_one", "A1")
+		require.NoError(t, err)
+		require.Equal(t, "string", header)
+
+		value, err := file.GetCellValue("sheet_one", "A2")
+		require.NoError(t, err)
+		require.Equal(t, "string", value)
+	})
+
+	t.Run("pointer receiver sheet", func(t *testing.T) {
+		buffer, err := WriteExcelAsBytesBuffer([]SheetModel{&PointerReceiverSheet{Col1: "v"}})
+		require.NoError(t, err)
+		require.NotNil(t, buffer)
+		require.NotZero(t, buffer.Len())
+
+		file, err := excelize.OpenReader(bytes.NewReader(buffer.Bytes()))
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			require.NoError(t, file.Close())
+		})
+
+		header, err := file.GetCellValue("pointer_receiver_sheet", "A1")
+		require.NoError(t, err)
+		require.Equal(t, "col1", header)
+
+		value, err := file.GetCellValue("pointer_receiver_sheet", "A2")
+		require.NoError(t, err)
+		require.Equal(t, "v", value)
+	})
+
 	t.Run("nil row", func(t *testing.T) {
 		_, err := WriteExcelAsBytesBuffer([]SheetModel{nil})
+		require.EqualError(t, err, "nil reference row append is not allowed")
+	})
+
+	t.Run("nil typed pointer row", func(t *testing.T) {
+		var model *Sheet1
+		_, err := WriteExcelAsBytesBuffer([]SheetModel{model})
 		require.EqualError(t, err, "nil reference row append is not allowed")
 	})
 }
@@ -485,6 +576,18 @@ func TestAppendRow_PointerModel(t *testing.T) {
 	err = appendRow(sw, model, 0, &options{timeFormatLayout: "2006-01-02 15:04:05", floatPrecision: 2, floatFmt: 'f'})
 	require.NoError(t, err)
 	require.NoError(t, sw.Flush())
+
+	header, err := f.GetCellValue("pointer_sheet", "A1")
+	require.NoError(t, err)
+	require.Equal(t, "string", header)
+
+	value, err := f.GetCellValue("pointer_sheet", "A2")
+	require.NoError(t, err)
+	require.Equal(t, "string", value)
+
+	nullValue, err := f.GetCellValue("pointer_sheet", "F2")
+	require.NoError(t, err)
+	require.Empty(t, nullValue)
 }
 
 func TestAppendRow_NilPointerModel(t *testing.T) {

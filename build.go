@@ -117,15 +117,14 @@ func write(sheetModels []SheetModel, opts ...Option) (*excelize.File, error) {
 	swMap := make(map[string]*excelize.StreamWriter)
 	lineNumMap := make(map[string]int)
 	for _, sheetModel := range sheetModels {
-		if sheetModel == nil {
-			return nil, errors.New("nil reference row append is not allowed")
+		if _, err := modelStructValue(sheetModel); err != nil {
+			return nil, err
 		}
 		sheetName := sheetModel.SheetName()
 		if sheetName == "" {
 			return nil, errors.New("sheetModel must have a sheet name")
 		}
 
-		modelKind := reflect.TypeOf(sheetModel).Kind()
 		line := lineNumMap[sheetName]
 		sw, ok := swMap[sheetName]
 		if !ok {
@@ -139,14 +138,8 @@ func write(sheetModels []SheetModel, opts ...Option) (*excelize.File, error) {
 			swMap[sheetName] = sw
 		}
 		lineNumMap[sheetName]++
-		switch modelKind {
-		case reflect.Struct:
-			err := appendRow(sw, sheetModel, line, options)
-			if err != nil {
-				return nil, err
-			}
-		default:
-			return nil, errors.New("sheetModel must be struct")
+		if err := appendRow(sw, sheetModel, line, options); err != nil {
+			return nil, err
 		}
 	}
 	err := setNoDataSheetHeaders(f, options)
@@ -189,6 +182,10 @@ func setNoDataSheetHeaders(f *excelize.File, options *options) error {
 		return nil
 	}
 	for _, model := range models {
+		modelValue, err := modelStructValue(model)
+		if err != nil {
+			return err
+		}
 		sheetName := model.SheetName()
 		idx, err := f.GetSheetIndex(sheetName)
 		if err != nil {
@@ -202,18 +199,7 @@ func setNoDataSheetHeaders(f *excelize.File, options *options) error {
 			return err
 		}
 
-		// Check whether model is a pointer.
-		if reflect.TypeOf(model).Kind() == reflect.Ptr {
-			if reflect.ValueOf(model).Elem().CanAddr() { // Check whether model is nil.
-				// Dereference the pointer value.
-				// If type(model) is SheetModel, then *model is still SheetModel.
-				model = reflect.Indirect(reflect.ValueOf(model)).Interface().(SheetModel)
-			} else {
-				return errors.New("nil reference row append is not allowed")
-			}
-		}
-
-		modelType := reflect.TypeOf(model)
+		modelType := modelValue.Type()
 		for i := 0; i < modelType.NumField(); i++ {
 			field := modelType.Field(i)
 			header := field.Tag.Get("excel_header")
@@ -322,18 +308,12 @@ func WithHeadless() Option {
 }
 
 func appendRow(sw *excelize.StreamWriter, sheetModel SheetModel, line int, options *options) error {
-	// Check whether sheetModel is a pointer.
-	if reflect.TypeOf(sheetModel).Kind() == reflect.Ptr {
-		if reflect.ValueOf(sheetModel).Elem().CanAddr() { // Check whether sheetModel is nil.
-			// Dereference the pointer value.
-			// If type(sheetModel) is SheetModel, then *sheetModel is still SheetModel.
-			sheetModel = reflect.Indirect(reflect.ValueOf(sheetModel)).Interface().(SheetModel)
-		} else {
-			return errors.New("nil reference row append is not allowed")
-		}
+	modelValue, err := modelStructValue(sheetModel)
+	if err != nil {
+		return err
 	}
 
-	modelType := reflect.TypeOf(sheetModel)
+	modelType := modelValue.Type()
 	line++                              // Index starts from 0, but Excel starts from 1.
 	if line == 1 && !options.headless { // Set header.
 		var values []any
@@ -364,8 +344,8 @@ func appendRow(sw *excelize.StreamWriter, sheetModel SheetModel, line int, optio
 	var values = make([]any, 0, modelType.NumField())
 	for i := 0; i < modelType.NumField(); i++ {
 		field := modelType.Field(i)
-		fieldValue := reflect.ValueOf(sheetModel).Field(i) // get field value
-		fieldKind := field.Type.Kind()                     // get field kind
+		fieldValue := modelValue.Field(i) // Get field value.
+		fieldKind := field.Type.Kind()    // Get field kind.
 	unAddrTo:
 		switch fieldKind {
 		case reflect.Pointer: // If the field is a pointer, resolve its value.
@@ -428,6 +408,23 @@ func appendRow(sw *excelize.StreamWriter, sheetModel SheetModel, line int, optio
 		return err
 	}
 	return nil
+}
+
+func modelStructValue(model SheetModel) (reflect.Value, error) {
+	if model == nil {
+		return reflect.Value{}, errors.New("nil reference row append is not allowed")
+	}
+	v := reflect.ValueOf(model)
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return reflect.Value{}, errors.New("nil reference row append is not allowed")
+		}
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return reflect.Value{}, errors.New("sheetModel must be struct")
+	}
+	return v, nil
 }
 
 // The following code is copied and modified from https://github.com/360EntSecGroup-Skylar/excelize.
