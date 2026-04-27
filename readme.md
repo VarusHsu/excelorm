@@ -63,3 +63,51 @@ if err := excelorm.WriteExcelSaveAs("foo.xlsx", sheetModels,
 [foo.xlsx](foo.xlsx)
 
 * To support multiple sheets, define more structs that implement `SheetName`.
+
+## Read APIs
+
+### Read into models
+
+Use `ReadExcelToModels` to parse one sheet into a typed slice. The target must be a pointer to slice (`*[]T` or `*[]*T`), and `T` must implement `SheetName`.
+
+```go
+var rows []Foo
+if err := excelorm.ReadExcelToModels("foo.xlsx", &rows); err != nil {
+    log.Fatal(err)
+}
+```
+
+### Read into maps
+
+Use `ReadExcelToMaps` to read a sheet as `[]map[string]string`.
+
+```go
+rows, err := excelorm.ReadExcelToMaps("foo.xlsx", "foo sheet name")
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println(rows[0]["id"])
+```
+
+### Strict mode
+
+Strict mode validates header consistency:
+
+- Rejects empty headers.
+- Rejects duplicated headers.
+- Rejects headers in Excel that do not map to model fields.
+- Rejects model fields that are missing in Excel.
+
+```go
+var rows []Foo
+if err := excelorm.ReadExcelToModels("foo.xlsx", &rows, excelorm.WithReadStrictMode()); err != nil {
+    log.Fatal(err)
+}
+```
+
+### Read options
+
+- `WithReadTimeFormatLayout(layout)` for parsing `time.Time`.
+- `WithReadBoolValueAs(trueValue, falseValue)` for custom bool values.
+- `WithReadIfNullValue(value)` to map marker values to nil pointers.
+
