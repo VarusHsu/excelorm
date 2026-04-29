@@ -52,7 +52,7 @@ func TestReadExcelToModels(t *testing.T) {
 	require.Len(t, rows, 1)
 	require.Equal(t, "string", rows[0].Col1)
 	require.Equal(t, 1, rows[0].Col2)
-	require.Equal(t, 1.1, rows[0].Col3)
+	require.InDelta(t, 1.1, rows[0].Col3, 1e-9)
 	require.True(t, rows[0].Col4)
 	require.Equal(t, time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC), rows[0].Col5)
 	require.Nil(t, rows[0].Col6)
@@ -108,7 +108,7 @@ func TestReadExcelToModels_HeaderOnlySheet(t *testing.T) {
 	var rows []Sheet1
 	err := ReadExcelToModels(path, &rows)
 	require.NoError(t, err)
-	require.Len(t, rows, 0)
+	require.Empty(t, rows)
 }
 
 func TestReadExcelToMaps_HeaderOnlySheet(t *testing.T) {
@@ -118,7 +118,7 @@ func TestReadExcelToMaps_HeaderOnlySheet(t *testing.T) {
 
 	rows, err := ReadExcelToMaps(path, "sheet_one")
 	require.NoError(t, err)
-	require.Len(t, rows, 0)
+	require.Empty(t, rows)
 }
 
 func TestReadExcelToModels_StrictMode(t *testing.T) {
