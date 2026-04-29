@@ -368,13 +368,6 @@ func sheetNameFromType(modelType reflect.Type) (string, error) {
 		}
 		return sheetName, nil
 	}
-	if model, ok := reflect.New(modelType).Elem().Interface().(SheetModel); ok {
-		sheetName := model.SheetName()
-		if sheetName == "" {
-			return "", errors.New("sheetModel must have a sheet name")
-		}
-		return sheetName, nil
-	}
 	return "", errors.New("slice element must implement SheetModel")
 }
 
