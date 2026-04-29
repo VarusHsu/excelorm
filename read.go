@@ -476,6 +476,7 @@ func assignPrimitiveByMeta(fieldValue reflect.Value, raw string, fieldMeta readF
 
 	switch fieldMeta.value {
 	case readValueString:
+		// Preserve original string without trimming, as users may want to keep leading/trailing spaces
 		fieldValue.SetString(raw)
 		return nil
 	case readValueBool:
