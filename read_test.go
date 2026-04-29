@@ -100,6 +100,27 @@ func TestReadExcelToMapsFromBytesBuffer(t *testing.T) {
 	require.Equal(t, "string", rows[0]["string"])
 }
 
+func TestReadExcelToModels_HeaderOnlySheet(t *testing.T) {
+	path := writeCustomSheet(t, "sheet_one", [][]string{
+		{"string", "int", "float", "bool", "time", "string pointer", "int pointer", "float pointer", "bool pointer", "time pointer"},
+	})
+
+	var rows []Sheet1
+	err := ReadExcelToModels(path, &rows)
+	require.NoError(t, err)
+	require.Len(t, rows, 0)
+}
+
+func TestReadExcelToMaps_HeaderOnlySheet(t *testing.T) {
+	path := writeCustomSheet(t, "sheet_one", [][]string{
+		{"string", "int", "float", "bool", "time", "string pointer", "int pointer", "float pointer", "bool pointer", "time pointer"},
+	})
+
+	rows, err := ReadExcelToMaps(path, "sheet_one")
+	require.NoError(t, err)
+	require.Len(t, rows, 0)
+}
+
 func TestReadExcelToModels_StrictMode(t *testing.T) {
 	t.Run("rejects unknown header", func(t *testing.T) {
 		path := writeCustomSheet(t, "sheet_one", [][]string{
