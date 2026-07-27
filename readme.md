@@ -3,7 +3,7 @@
 ![Build Status](https://github.com/varushsu/excelorm/actions/workflows/go.yml/badge.svg)
 ![GitHub Release](https://img.shields.io/github/v/release/varushsu/excelorm)
 ![GitHub](https://img.shields.io/github/license/varushsu/excelorm)
-![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Fvarushsu%2Fexcelorm)
+![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Fvarushsu%2Fexcelorm&v=2)
 
 A lightweight and easy-to-use Excel file generation tool for Go.
 
